@@ -1,0 +1,53 @@
+62a63,64
+> # 09/07/2009 by SGT
+> # add use of dictionary for private password (papublic)
+138c140,141
+< 
+---
+> # SGT
+>   _max_dic_size = 512000 #max dictionary size in bytes
+387a391,414
+>       self.pass_lines = None
+>       padic = self.config.getboolean('publicmode','usedic')
+>       if padic:
+>         self.randnum = self.config.getint('publicmode','randnum')
+>         padicfile = self.config.get('publicmode','dicfile')
+>         if os.path.exists(padicfile):
+>           stinfo = os.stat(padicfile)
+>           if stinfo.st_size > self._max_dic_size:
+>             self.warn('The dictionary file is too big. Switching to default.')
+>           else:
+>             dicfile = open(padicfile)
+>             text = dicfile.read().strip()
+>             dicfile.close()
+>             if text == "":
+>               self.warn('Dictionary file is empty. Switching to default.')
+>             else:
+>               self.pass_lines = text.splitlines()
+>           self.debug('Using dictionary password.')
+>         else:
+>           self.warn('Dictionary is enabled but the file doesn\'t exists. Switching to default.')
+>     except:
+>       self.debug('Cannot load dictionary config. Using default')
+> 
+>     try:
+395c422
+< 
+---
+>     
+1069a1097,1105
+>         if self.pass_lines is not None:
+>           i = random.randint(0,len(self.pass_lines)-1)
+>           self._papublic_password = self.pass_lines[i]
+>           
+>           for i in range(0,self.randnum):
+>             self._papublic_password += str(random.randint(1,9))
+>           
+>           self.debug('Private password set to: %s' % self._papublic_password)
+>         
+1075a1112
+>           client.message('^7type ^5!mapreload^7 to apply change')          
+1077d1113
+<           client.message('^7type ^5!mapreload^7 to apply change')
+1078a1115
+> 

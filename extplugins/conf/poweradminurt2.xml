@@ -1,0 +1,185 @@
+<configuration plugin="poweradmin">
+	<settings name="commands">
+		<set name="pacyclemap-cyclemap">60</set>
+		<set name="pamaprestart-maprestart">60</set>
+		<set name="pamapreload-mapreload">60</set>
+		<set name="pamute-mute">80</set>
+		<set name="panuke-nuke">80</set>
+		<set name="paslap-slap">80</set>
+		<set name="paveto-veto">80</set>
+		<set name="pabigtext-bigtext">60</set>
+		<set name="pashuffleteams-shuffleteams">60</set>
+		<set name="paswapteams-swapteams">60</set>
+		<set name="paforce-force">60</set>
+		<set name="pavote">60</set>
+
+		<set name="papause">100</set>
+		<set name="paset">100</set>
+		<set name="paget">100</set>
+		<set name="paexec">100</set>
+
+		<set name="pateams-teams">2</set>
+		
+		<!--  by Courgette -->
+		<set name="pamoon-moon">20</set>
+
+		<set name="papublic-public">60</set>
+    <set name="usedic">False</set>
+    <set name="dicfile">dicfile.txt</set>
+    <set name="randnum">3</set>
+
+		<set name="pamatch-match">60</set>
+		<set name="pagear-gear">60</set>
+    
+		<set name="paffa-ffa">60</set>
+		<set name="patdm-tdm">60</set>
+		<set name="pats-ts">60</set>
+		<set name="paftl-ftl">60</set>
+		<set name="pacah-cah">60</set>
+		<set name="pactf-ctf">60</set>
+		<set name="pabomb-bomb">60</set>
+		
+    <set name="paident-id">20</set>
+    <!--  END by Courgette -->
+
+    <!--  by:FSK405|Fear -->
+    <set name="pawaverespawns-waverespawns">20</set>
+    <set name="pasetnextmap-setnextmap">20</set>
+    <set name="parespawngod-respawngod">20</set>
+    <set name="parespawndelay-respawndelay">20</set>
+    <set name="pacaplimit-caplimit">20</set>
+    <set name="patimelimit-timelimit">20</set>
+    <set name="pafraglimit-fraglimit">20</set>
+    <set name="pabluewave-bluewave">20</set>
+    <set name="paredwave-redwave">20</set>
+    <set name="pahotpotato-hotpotato">20</set>
+    <!--  END by: FSK405|Fear -->
+
+	</settings>
+
+  <settings name="namechecker">
+    <!-- count namechanges per client per map -->
+    <set name="checkchanges">True</set>
+    <!-- maximum namechanges per map allowed before we kick a client (no moderators or admins) -->
+    <set name="checkallowedchanges">7</set>
+
+    <!-- ninterval sets checking intervals in minutes, 0 disables function -->
+    <set name="ninterval">0</set>
+    <!-- check and warn players with duplicate names -->
+    <set name="checkdupes">True</set>
+    <!-- check and warn players with the standard 'New UrT Player' name -->
+    <set name="checkunknown">True</set>
+    <!-- check and warn players with the forbidden name 'all' -->
+    <set name="checkbadnames">True</set>
+	</settings>
+
+  <settings name="teambalancer">
+    <!-- tinterval sets checking intervals in minutes, 0 disables function -->
+    <set name="tinterval">2</set>
+    <!-- how much difference should we tolerate -->
+    <set name="teamdifference">1</set>
+    <!-- maxlevel and above won't be balanced so admins can help weaker teams -->
+    <set name="maxlevel">40</set>
+    <!-- announce: 0 = silent, 1 = console say, 2 = center screen -->
+    <set name="announce">2</set>
+    <!-- if True, maintain balance when clients change teams - if False, don't -->
+    <set name="team_change_force_balance_enable">True</set>
+    <!-- specify which gametypes to autobalance - separate with space or comma -->
+    <!-- FreeForAll=dm, TeamDeathMatch=tdm, Team Survivor=ts, Follow the Leader=ftl, Capture and Hold=cah, Capture The Flag=ctf, Bombmode=bm -->
+    <set name="autobalance_gametypes">tdm</set>
+    <!-- If a player is locked using !paforceteam, should it be permanent? False releases all locks on gameExit -->
+    <set name="teamLocksPermanent">False</set>
+	</settings>
+
+  <settings name="votedelay">
+    <!-- votedelay disables voting at roundstart in minutes, 0 disables function. -->
+    <set name="votedelay">0</set>
+	</settings>
+
+  <settings name="speccheck">
+    <!-- sinterval sets checking intervals in minutes, 0 disables function -->
+    <!-- it will warn 3 times before kick, so kick after: maxspectime + 3 * sinterval -->
+    <set name="sinterval">2</set>
+    <!-- how long a player may idle in spec in minutes -->
+    <set name="maxspectime">5</set>
+    <!-- with how many players do we consider the server full and start checking spectators -->
+    <set name="maxplayers">10</set>
+    <!-- maxlevel and above won't be handled so they may idle in spec -->
+    <set name="maxlevel">2</set>
+	</settings>
+
+  <settings name="moonmode"><!--  # by Courgette -->
+    <!-- gravity_on : the gravity to swith to in moon mode (default:100) -->
+    <set name="gravity_on">100</set>
+    <!-- gravity_off : the gravity to swith to in moon mode (default:800) -->
+    <set name="gravity_off">800</set>
+	</settings>
+	
+  <settings name="publicmode"><!--  # by Courgette -->
+    <!-- g_password : the password to use when using command !papublic off-->
+    <set name="g_password">secret</set>
+	</settings>
+
+  <pamatch_plugins_disable>
+    <!-- The Plugins that need to be disabled during matchmode -->
+    <plugin>spree</plugin>
+    <plugin>adv</plugin>
+    <plugin>tk</plugin>
+    <plugin>pingwatch</plugin>
+  </pamatch_plugins_disable>
+
+  <!-- BOTSUPPORT IS VERY UNSTABLE! IT MAY CRASH YOUR SERVER PLENTY! -->
+  <settings name="botsupport">
+    <!-- enable bots for the server -->
+    <set name="bot_enable">False</set>
+    <!-- skill level of the bots 1-5 -->
+    <set name="bot_skill">4</set>
+    <!-- will add bots untill this number of players is reached -->
+    <set name="bot_minplayers">4</set>
+    <!-- maps that have proven to be stable to support bots, be very carefull! -->
+    <set name="bot_maps">ut4_abbey ut4_algiers ut4_austria ut4_riyadh ut4_uptown</set>
+	</settings>
+
+  <settings name="headshotcounter">
+    <!-- enable the headshot counter? -->
+    <set name="hs_enable">True</set>
+    <!-- reset counts after each map? -->
+    <set name="reset_vars">True</set>
+    <!-- set broadcast to True if you want the counter to appear in the upper left, False is in chatarea -->
+    <set name="broadcast">True</set>
+    <!-- Announce every single headshot? -->
+    <set name="announce_all">True</set>
+    <!-- Announce percentages (after 5 headshots) -->
+    <set name="announce_percentages">True</set>
+    <!-- Only show percentages larger than next threshold -->
+    <set name="percent_min">10</set>
+    <!-- Advise victims to wear a helmet? -->
+    <set name="warn_helmet">True</set>
+    <!-- After how many headshots? -->
+    <set name="warn_helmet_nr">7</set>
+    <!-- Advise victims to wear kevlar? -->
+    <set name="warn_kevlar">True</set>
+    <!-- After how many torso hits? -->
+    <set name="warn_kevlar_nr">50</set>
+	</settings>
+
+  <settings name="rotationmanager">
+    <!-- enable the rotationmanager? -->
+    <set name="rm_enable">True</set>
+    <!-- path to your current mapcycle.txt -->
+    <set name="gamepath">/home/mark/games/urt_tdm/q3ut4/</set>
+    <!-- number of players when to switch rotations - from small to medium -->
+    <set name="switchcount1">4</set>
+    <!-- number of players when to switch rotations - from medium to large -->
+    <set name="switchcount2">12</set>
+    <!-- Hysteresis setting for the switchpoints: switchcount +/- hysteresis will change rotations -->
+    <set name="hysteresis">2</set>
+    <!-- name of the file holding the small rotation - must also be in your gamepath -->
+    <set name="smallrotation">b3_cycle_small.txt</set>
+    <!-- name of the file holding the medium rotation - must also be in your gamepath -->
+    <set name="mediumrotation">b3_cycle_medium.txt</set>
+    <!-- name of the file holding the large rotation - must also be in your gamepath -->
+    <set name="largerotation">b3_cycle_large.txt</set>
+	</settings>
+
+</configuration>

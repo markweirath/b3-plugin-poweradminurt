@@ -1,0 +1,80 @@
+================================================================================
+Damage
+--------------------------------------------------------------------------------
+#Hit: 13 10 0 8: Grover hit jacobdk92 in the Head
+#Hit: VictimCid AttackerCid hitLoc WeaponIndex: <text>
+
+hitLoc index:
+--------------------------------------------------------------------------------
+head                  0
+helmet                1
+torso                 2
+kevlar                3
+arms                  4
+legs                  5
+...                   6
+
+
+Weaponindex:
+--------------------------------------------------------------------------------
+KNIFE                 1
+BERETTA               2
+DEAGLE                3
+SPAS12                4
+MP5K                  5
+UMP45                 6
+HK69                  7
+M4                    8
+G36                   9
+PSG1                  10    
+GRENADE_HE            11    
+NEGEV                 17    
+GRENADE_SMOKE         13    
+SR8                   14    
+AK103                 15    
+
+================================================================================
+Kills
+--------------------------------------------------------------------------------
+#Kill: 14 4 21: Qst killed Leftovercrack by UT_MOD_PSG1
+#kill: AtackerCiD VictimCid WeaponIndex: <text>
+
+WeaponIndex:
+--------------------------------------------------------------------------------
+Unknown                 0
+Drowning                1
+Got Slimed              2
+Meltdown                3
+Crushed                 4
+Telefragged             5   
+Doing the Lemming thing 6         
+Suicide                 7
+Laser Target            8   
+Damage by triggers      9       
+Changing Team           10  
+Cut by Knife            12
+Thrown Knife            13
+Beretta                 14
+Desert Eagle            15    
+Spas 12                 16
+UMP 45                  17
+MP5K                    18
+LR300                   19
+G36                     20
+PSG1                    21
+HK 69                   11
+Excessive Bloodloss     23          
+HK 69 hit               37
+High Explosive Grenade  25         
+Flash Grenade           26
+Smoke Grenade           27
+SR8                     28
+Sacrificed his life     29          
+AK 103                  30
+Exploded                31
+Bitchslapped            32  
+Negev                   35
+M4                      38
+Got kicked              24      
+================================================================================
+

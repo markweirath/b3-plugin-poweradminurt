@@ -1,0 +1,30 @@
+--------------------------------------------------------------------------------
+Installation of PowerAdminUrt for B3 v1.1.3+
+--------------------------------------------------------------------------------
+*  Read all in this zip file included readme's prior to installation. 
+*  This version of PowerAdminUrt is in development for use with the latest
+   version of B3: v1.1.3.
+   How to get this version see here: 
+   http://www.bigbrotherbot.com/forums/index.php?topic=353.0
+   You can also grab a B3 package from my development branch, this version
+   might be unstable though:
+   http://xlr8or.snt.utwente.nl/hg/b3?ca=9f36620020ea;type=gz
+*  Then Copy the content of this zip file into the corresponding b3 
+   (sub)directories.
+
+--------------------------------------------------------------------------------
+Support for the basic Bot:
+--------------------------------------------------------------------------------
+Many questions are answered in the manual, both for installation and usage.
+*  Installation: http://b3.python-hosting.com/wiki/BotInstall
+*  General documentation: http://b3.python-hosting.com/wiki/BotManual
+
+--------------------------------------------------------------------------------
+Support for the UrT addon:
+--------------------------------------------------------------------------------
+* Post your issues here: http://bigbrotherbot.com/forums/index.php?board=3.0
+
+--------------------------------------------------------------------------------
+Please check if your problem is not already discussed in other threads before 
+starting a new one.
+*  http://bigbrotherbot.com/forums/index.php?action=search
