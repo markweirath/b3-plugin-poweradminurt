@@ -78,17 +78,24 @@
 # /!\ REQUIRES B3 v1.2.1 /!\
 # * add !pamap which works with partial map names
 # * update !pasetnextmap to work with partial map names
+# 27/10/2009 - 1.5.1 - Courgette
+# * debug !pamap and !pasetnextmap
+# * debug dictionnary use for !papublic
+# * !papublic can now use randnum even if dictionnary is not used
 
-__version__ = '1.4.3'
+__version__ = '1.5.1'
 __author__  = 'xlr8or'
 
 import b3, time, thread, threading, re
 import b3.events
 import b3.plugin
 import b3.cron
+from b3.functions import soundex, levenshteinDistance
 
 import os
 import random
+import string
+import traceback
 
 #--------------------------------------------------------------------------------------------------
 class PoweradminurtPlugin(b3.plugin.Plugin):
@@ -406,33 +413,39 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
   def LoadPublicMode(self):
     # PUBLIC MODE SETUP
     try:
+      self.randnum = self.config.getint('publicmode','randnum')
+    except:
+      self.randnum = 0
+    
+    try:
       self.pass_lines = None
       padic = self.config.getboolean('publicmode','usedic')
       if padic:
-        self.randnum = self.config.getint('publicmode','randnum')
-        padicfile = self.config.get('publicmode','dicfile')
+        padicfile = self.config.getpath('publicmode','dicfile')
+        self.debug('trying to use password dictionnary %s' % padicfile)
         if os.path.exists(padicfile):
           stinfo = os.stat(padicfile)
           if stinfo.st_size > self._max_dic_size:
-            self.warn('The dictionary file is too big. Switching to default.')
+            self.warning('The dictionary file is too big. Switching to default.')
           else:
             dicfile = open(padicfile)
             text = dicfile.read().strip()
             dicfile.close()
             if text == "":
-              self.warn('Dictionary file is empty. Switching to default.')
+              self.warning('Dictionary file is empty. Switching to default.')
             else:
               self.pass_lines = text.splitlines()
           self.debug('Using dictionary password.')
         else:
-          self.warn('Dictionary is enabled but the file doesn\'t exists. Switching to default.')
+          self.warning('Dictionary is enabled but the file doesn\'t exists. Switching to default.')
     except:
+      traceback.print_exc()
       self.debug('Cannot load dictionary config. Using default')
     
     try:
       self._papublic_password = self.config.get('publicmode', 'g_password')
       if self._papublic_password is None:
-        self.warn('Can\'t setup papublic command because there is no password set in config')
+        self.warning('Can\'t setup papublic command because there is no password set in config')
     except:
       self._papublic_password = None
       self.debug('Can\'t setup papublic command because there is no password set in config')
@@ -1114,22 +1127,23 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
         self.console.setCvar( 'g_password', '' )
         self.console.say('^7public mode: ^2ON')
       elif data == 'off':
+        newpassword = self._papublic_password
         if self.pass_lines is not None:
           i = random.randint(0,len(self.pass_lines)-1)
-          self._papublic_password = self.pass_lines[i]
+          newpassword = self.pass_lines[i]
           
-          for i in range(0,self.randnum):
-            self._papublic_password += str(random.randint(1,9))
-          
-          self.debug('Private password set to: %s' % self._papublic_password)
+        for i in range(0,self.randnum):
+          newpassword += str(random.randint(1,9))
+      
+        self.debug('Private password set to: %s' % newpassword)
          
-        if self._papublic_password is None:
+        if newpassword is None:
           client.message('^4ERROR :^7 can\'t set public mode off because there is no password specified in the config file')
           return False
         else:
-          self.console.setCvar( 'g_password', '%s' % (self._papublic_password) )
+          self.console.setCvar( 'g_password', '%s' % (newpassword) )
           self.console.say('^7public mode: ^9OFF')
-          client.message('^7password is \'^4%s^7\''% (self._papublic_password))
+          client.message('^7password is \'^4%s^7\''% (newpassword))
           client.message('^7type ^5!mapreload^7 to apply change')
           self.console.write('bigtext "^7Server going ^3PRIVATE^7 soon !!"')
     return True
