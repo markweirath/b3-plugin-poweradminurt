@@ -385,7 +385,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     self.debug('Maxplayers: %s' %(self._smaxplayers))
 
   def LoadMoonMode(self):
-    #MOON MODE SETUP  # by Courgette
+    #MOON MODE SETUP
     try:
       self._moon_on_gravity = self.config.getint('moonmode', 'gravity_on')
     except:
@@ -401,7 +401,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     self.debug('Moon OFF gravity: %s' %(self._moon_off_gravity))
     
   def LoadPublicMode(self):
-    # PUBLIC MODE SETUP  # by Courgette
+    # PUBLIC MODE SETUP
     try:
       self.pass_lines = None
       padic = self.config.getboolean('publicmode','usedic')
@@ -1081,7 +1081,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
 
     return True
 
-  def cmd_pamoon(self, data, client, cmd=None): # by Courgette
+  def cmd_pamoon(self, data, client, cmd=None):
     """\
     Set moon mode <on/off>
     (You can safely use the command without the 'pa' at the beginning)
@@ -1098,7 +1098,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
         self.console.say('^7Moon mode: ^9OFF')
     return True
     
-  def cmd_papublic(self, data, client, cmd=None): # by Courgette
+  def cmd_papublic(self, data, client, cmd=None):
     """\
     Set server public mode on/off
     (You can safely use the command without the 'pa' at the beginning)
@@ -1131,7 +1131,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
           self.console.write('bigtext "^7Server going ^3PRIVATE^7 soon !!"')
     return True
     
-  def cmd_pamatch(self, data, client, cmd=None): # by Courgette and Joss
+  def cmd_pamatch(self, data, client, cmd=None): 
     """\
     Set server match mode on/off
     (You can safely use the command without the 'pa' at the beginning)
@@ -1169,7 +1169,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     return True
 
 
-  def cmd_pagear(self, data, client=None, cmd=None): # by Courgette
+  def cmd_pagear(self, data, client=None, cmd=None):
     """\
     <all/none/reset/[+-](nade|snipe|spas|pistol|auto|negev)> - Set allowed weapons.
     """
@@ -1227,7 +1227,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
       
     return True
     
-  def cmd_paffa(self, data, client, cmd=None): # by Courgette
+  def cmd_paffa(self, data, client, cmd=None):
     """\
     Change game type to Free For All
     (You can safely use the command without the 'pa' at the beginning)
@@ -1237,7 +1237,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
       client.message('^7game type changed to ^4Free For All')
     return True
     
-  def cmd_patdm(self, data, client, cmd=None): # by Courgette
+  def cmd_patdm(self, data, client, cmd=None):
     """\
     Change game type to Team Death Match
     (You can safely use the command without the 'pa' at the beginning)
@@ -1247,7 +1247,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
       client.message('^7game type changed to ^4Team Death Match')
     return True
     
-  def cmd_pats(self, data, client, cmd=None): # by Courgette
+  def cmd_pats(self, data, client, cmd=None):
     """\
     Change game type to Team Survivor
     (You can safely use the command without the 'pa' at the beginning)
@@ -1257,7 +1257,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
       client.message('^7game type changed to ^4Team Survivor')
     return True
     
-  def cmd_paftl(self, data, client, cmd=None): # by Courgette
+  def cmd_paftl(self, data, client, cmd=None):
     """\
     Change game type to Follow The Leader
     (You can safely use the command without the 'pa' at the beginning)
@@ -1267,7 +1267,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
       client.message('^7game type changed to ^4Follow The Leader')
     return True
     
-  def cmd_pacah(self, data, client, cmd=None): # by Courgette
+  def cmd_pacah(self, data, client, cmd=None):
     """\
     Change game type to Capture And Hold
     (You can safely use the command without the 'pa' at the beginning)
@@ -1277,7 +1277,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
       client.message('^7game type changed to ^4Capture And Hold')
     return True
     
-  def cmd_pactf(self, data, client, cmd=None): # by Courgette
+  def cmd_pactf(self, data, client, cmd=None):
     """\
     Change game type to Capture The Flag
     (You can safely use the command without the 'pa' at the beginning)
@@ -1287,7 +1287,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
       client.message('^7game type changed to ^4Capture The Flag')
     return True
     
-  def cmd_pabomb(self, data, client, cmd=None): # by Courgette
+  def cmd_pabomb(self, data, client, cmd=None):
     """\
     Change game type to Bomb
     (You can safely use the command without the 'pa' at the beginning)
@@ -1420,7 +1420,8 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
       return False
 
   def teamcheck(self):
-    # g_gametype //0=FreeForAll=dm, 3=TeamDeathMatch=tdm, 4=Team Survivor=ts, 5=Follow the Leader=ftl, 6=Capture and Hold=cah, 7=Capture The Flag=ctf, 8=Bombmode=bm
+    # g_gametype //0=FreeForAll=dm, 3=TeamDeathMatch=tdm, 4=Team Survivor=ts, 
+	# 5=Follow the Leader=ftl, 6=Capture and Hold=cah, 7=Capture The Flag=ctf, 8=Bombmode=bm
 
     # 10/22/2008 - 1.4.0b10 - mindriot
     # if gametype is unknown when B3 is started in the middle of a game
@@ -1959,6 +1960,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
    else:
       self.console.write( 'g_hotpotato "%s"' % data )
    return True
+
 
 if __name__ == '__main__':
   print '\nThis is version '+__version__+' by '+__author__+' for BigBrotherBot.\n'
