@@ -122,8 +122,9 @@
 		<set name="g_password">secret</set>
 		<!-- if randnum is greater than 0, then randnum numbers will be added to the password -->
 		<set name="randnum">0</set>
-		<!-- dicfile must be a text file containing one password per line -->
-		<set name="dicfile">dicfile.txt</set>
+		<!-- dicfile must be a text file containing one password per line.
+			Note: @conf is the directory where b3.xml is located -->
+		<set name="dicfile">@conf/dicfile.txt</set>
 	</settings>
 
 	<pamatch_plugins_disable>
