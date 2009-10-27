@@ -27,6 +27,7 @@
 
 		<set name="pamatch-match">60</set>
 		<set name="pagear-gear">60</set>
+		<set name="pamap-map">60</set>
 
 		<!-- Game mode commands -->
 		<set name="paffa-ffa">60</set>

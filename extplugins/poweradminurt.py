@@ -72,9 +72,12 @@
 # * Improved forceteam locking mechanism and messaging
 # 10/8/2009 - 1.4.2 - xlr8or
 # * Added TeamLock release command '!paforce all free' and release on gameExit
-#
 # 09/07/2009 - 1.4.3 by SGT
 # add use of dictionary for private password (papublic)
+# 27/10/2009 - 1.5.0 - Courgette
+# /!\ REQUIRES B3 v1.2.1 /!\
+# * add !pamap which works with partial map names
+# * update !pasetnextmap to work with partial map names
 
 __version__ = '1.4.3'
 __author__  = 'xlr8or'
@@ -1860,18 +1863,26 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
         self.console.say('^7Wave Respawns: ^9OFF')
     return True
 
-  def cmd_pasetnextmap(self, data, client, cmd=None):
-   """\
-   <mapname> - Set the nextmap. Must type the mapname exactly.
-   """
-   if not data:
-      client.message('^7Invalid or missing data, try !help setnextmap')
-      return False
-   else:
-      self.console.write( 'g_nextmap "%s"' % data )
-      map = self.console.getNextMap()
-      self.console.say('^7Nextmap is: ^2%s' % map)
-   return True
+  def cmd_pasetnextmap(self, data, client=None, cmd=None):
+	"""\
+	<mapname> - Set the nextmap (partial map name works)
+	"""
+	if not data:
+	  client.message('^7Invalid or missing data, try !help setnextmap')
+	  return False
+	else:
+		match = self.getMapsSoundingLike(data)
+		if len(match) > 1:
+			client.message('do you mean : %s ?' % string.join(match,', '))
+			return True
+		if len(match) == 1:
+			mapname = match[0]
+			self.console.write('g_nextmap %s' % mapname)
+			if client:
+				client.message('^7nextmap set to %s' % mapname)
+		else:
+			client.message('^7cannot find any map like [^4%s^7].' % data)
+			return False
 
   def cmd_parespawngod(self, data, client, cmd=None):
    """\
@@ -1960,6 +1971,66 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
    else:
       self.console.write( 'g_hotpotato "%s"' % data )
    return True
+
+
+
+  def cmd_pamap(self, data, client, cmd=None):
+    """\
+    <map> - switch current map
+    """
+    if not data:
+        client.message('^7You must supply a map to change to.')
+        return
+    match = self.getMapsSoundingLike(data)
+    if len(match) > 1:
+        client.message('do you mean : %s' % string.join(match,', '))
+        return True
+    if len(match) == 1:
+        mapname = match[0]
+    else:
+        client.message('^7cannot find any map like [^4%s^7].' % data)
+        return False
+
+    self.console.say('^7Changing map to %s' % mapname)
+    time.sleep(1)
+    self.console.write('map %s' % mapname)
+    return True
+
+
+  def getMapsSoundingLike(self, mapname):
+    maplist = self.console.getMaps()
+    data = mapname.strip()
+
+    soundex1 = soundex(string.replace(string.replace(data, 'ut4_',''), 'ut_',''))
+    #self.debug('soundex %s : %s' % (data, soundex1))
+
+    match = []
+    if data in maplist:
+        match = [data]
+    else:
+        for m in maplist:
+            s = soundex(string.replace(string.replace(m, 'ut4_',''), 'ut_',''))
+            #self.debug('soundex %s : %s' % (m, s))
+            if s == soundex1:
+               #self.debug('probable map : %s', m)
+               match.append(m)
+
+    if len(match) == 0:
+        # suggest closest spellings
+        shortmaplist = []
+        for m in maplist:
+            if m.find(data) != -1:
+                shortmaplist.append(m)
+        if len(shortmaplist) > 0:
+            shortmaplist.sort(key=lambda map: levenshteinDistance(data, string.replace(string.replace(map.strip(), 'ut4_',''), 'ut_','')))
+            self.debug("shortmaplist sorted by distance : %s" % shortmaplist)
+            match = shortmaplist[:3]
+        else:
+            maplist.sort(key=lambda map: levenshteinDistance(data, string.replace(string.replace(map.strip(), 'ut4_',''), 'ut_','')))
+            self.debug("maplist sorted by distance : %s" % maplist)
+            match = maplist[:3]
+    return match
+
 
 
 if __name__ == '__main__':
