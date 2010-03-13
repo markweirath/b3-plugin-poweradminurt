@@ -150,8 +150,8 @@
 	<settings name="headshotcounter">
 		<!-- enable the headshot counter? -->
 		<set name="hs_enable">True</set>
-		<!-- reset counts after each map? -->
-		<set name="reset_vars">True</set>
+		<!-- reset counts? Options: no / map / round -->
+		<set name="reset_vars">no</set>
 		<!-- set broadcast to True if you want the counter to appear in the upper left, False is in chatarea -->
 		<set name="broadcast">True</set>
 		<!-- Announce every single headshot? -->
