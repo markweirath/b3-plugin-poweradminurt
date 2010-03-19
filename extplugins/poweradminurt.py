@@ -89,8 +89,10 @@
 # * Send rcon result to client on !paexec
 # 13/03/2010 - 1.5.3 - xlr8or
 # * fixed headshotcounter reset. now able to set it to 'no', 'round', or 'map'
+# 19/03/2010 - 1.5.4 - xlr8or
+# * fixed endless loop in ignoreCheck()
 
-__version__ = '1.5.3'
+__version__ = '1.5.4'
 __author__  = 'xlr8or'
 
 import b3, time, thread, threading, re
@@ -1885,7 +1887,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     Tests if the ignore flag is set, to disable certain automatic functions when unwanted
     Returns True if the functionality should be ignored 
     """
-    if self.ignoreCheck():
+    if self._ignoreTill - self.console.time() > 0:
       return True
     else:
       return False
