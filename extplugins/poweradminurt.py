@@ -91,8 +91,10 @@
 # * fixed headshotcounter reset. now able to set it to 'no', 'round', or 'map'
 # 19/03/2010 - 1.5.4 - xlr8or
 # * fixed endless loop in ignoreCheck()
+# 30/06/2010 - 1.5.5 - xlr8or
+# * no longer set bot_enable var to 0 on startup when botsupport is disabled.
 
-__version__ = '1.5.4'
+__version__ = '1.5.5'
 __author__  = 'xlr8or'
 
 import b3, time, thread, threading, re
@@ -507,8 +509,6 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     if self._botenable:
       # if it isn't enabled already it takes a mapchange to activate
       self.console.write('set bot_enable 1')
-    else:
-      self.console.write('set bot_enable 0')
     # set the correct botskill anyway
     self.console.write('set g_spskill %s' %(self._botskill))
 
