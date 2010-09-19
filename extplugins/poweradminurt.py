@@ -82,11 +82,22 @@
 # * debug !pamap and !pasetnextmap
 # * debug dictionnary use for !papublic
 # * !papublic can now use randnum even if dictionnary is not used
-# 20/09/2010 - 1.5.2 - Courgette
+# 31/01/2010 - 1.5.2 - xlr8or
+# * added ignore Set and Check functions for easier implementation in commands
+# * added ignoreSet(30) to swapteams and shuffleteams to temp disable auto checking functions
+#   Note: this will be overridden by the ignoreSet(60) when the new round starts after swapping/shuffling!
+# * Send rcon result to client on !paexec
+# 13/03/2010 - 1.5.3 - xlr8or
+# * fixed headshotcounter reset. now able to set it to 'no', 'round', or 'map'
+# 19/03/2010 - 1.5.4 - xlr8or
+# * fixed endless loop in ignoreCheck()
+# 30/06/2010 - 1.5.5 - xlr8or
+# * no longer set bot_enable var to 0 on startup when botsupport is disabled.
+# 20/09/2010 - 1.5.6 - Courgette
 # * debug !paslap and !panuke
 # * add tests
 
-__version__ = '1.5.2'
+__version__ = '1.5.6'
 __author__  = 'xlr8or'
 
 import b3, time, thread, threading, re
@@ -206,7 +217,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     self.registerEvent(b3.events.EVT_CLIENT_NAME_CHANGE)
 
     # don't run cron-checks on startup
-    self._ignoreTill = self.console.time() + 60
+    self.ignoreSet(60)
     self._balancing = False
     
     # save original vote settings
@@ -501,8 +512,6 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     if self._botenable:
       # if it isn't enabled already it takes a mapchange to activate
       self.console.write('set bot_enable 1')
-    else:
-      self.console.write('set bot_enable 0')
     # set the correct botskill anyway
     self.console.write('set g_spskill %s' %(self._botskill))
 
@@ -522,9 +531,11 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
       self._hsenable = False
       self.debug('Using default value (%s) for hs_enable', self._hsenable)
     try:
-      self._hsresetvars = self.config.getboolean('headshotcounter', 'reset_vars')
+      self._hsresetvars = self.config.get('headshotcounter', 'reset_vars')
+      if not self._hsresetvars in ['no', 'map', 'round']:
+          raise Exception('Config setting not valid.')
     except:
-      self._hsresetvars = True
+      self._hsresetvars = 'map'
       self.debug('Using default value (%s) for reset_vars', self._hsresetvars)
     try:
       self._hsbroadcast = self.config.getboolean('headshotcounter', 'broadcast')
@@ -681,9 +692,10 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
       self._mapchanged = True
       if self._botenable:
         self.botsdisable()
-      self._ignoreTill = self.console.time() + 60
-      # reset headshotcounter if applicable (we'll do it on game exit and roundstart to be thorough)
-      self.resetVars()
+      self.ignoreSet(60)
+      # reset headshotcounter (per map) if applicable
+      if self._hsresetvars == 'map':
+          self.resetVars()
       # reset number of Namechanges per client
       self.resetNameChanges()
       if not self._teamLocksPermanent:
@@ -701,10 +713,11 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
       if self._botenable:
         self.botsdisable()
         self.botsupport()
-      # reset headshotcounter if applicable (we'll do it on game exit and roundstart to be thorough)
-      self.resetVars()
+      # reset headshotcounter (per round) if applicable
+      if self._hsresetvars == 'round':
+          self.resetVars()
       # ignore teambalance checking for 1 minute
-      self._ignoreTill = self.console.time() + 60
+      self.ignoreSet(60)
       self._teamred = 0
       self._teamblue = 0
       # vote delay init
@@ -810,7 +823,8 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     else:
       if re.match('^[a-z0-9_.]+.cfg$', data, re.I):
         self.debug('Executing configfile = [%s]', data)
-        self.console.write('exec %s' % data)
+        result = self.console.write('exec %s' % data)
+        cmd.sayLoudOrPM(client, result)
       else:
         self.error('%s is not a valid configfile', data)
 
@@ -919,7 +933,8 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     """\
     <message> - Pause the game. Type again to resume
     """
-    self.console.write( 'pause')
+    result = self.console.write('pause')
+    cmd.sayLoudOrPM(client, result)
 
     return True
 
@@ -1092,6 +1107,8 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     Swap teams.
     (You can safely use the command without the 'pa' at the beginning)
     """
+    # Ignore automatic checking before giving the command
+    self.ignoreSet(30)
     self.console.write('swapteams')
 
     return True
@@ -1101,6 +1118,8 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     Shuffle teams.
     (You can safely use the command without the 'pa' at the beginning)
     """
+    # Ignore automatic checking before giving the command
+    self.ignoreSet(30)
     self.console.write('shuffleteams')
 
     return True
@@ -1368,7 +1387,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     if self._team_change_force_balance_enable and not self._matchmode:
       
       # if the round just started, don't do anything 
-      if self.console.time() < self._ignoreTill:
+      if self.ignoreCheck():
         return None
 
       if self.isEnabled() and not self._balancing:
@@ -1712,7 +1731,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     self.debug('ClientVars set up for %s' % client.name)
 
   def resetVars(self):
-    if self.isEnabled() and self._hsenable and self._hsresetvars:
+    if self.isEnabled() and self._hsenable:
       clients = self.console.clients.getList()
       for c in clients:
         if c.isvar(self, 'hitvars'):
@@ -1854,8 +1873,33 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     else:
       pass  
 
+#--Support Functions------------------------------------------------------------------------------
+
   def clean(self, data):
     return re.sub(self._reClean, '', data)[:20]
+
+  def ignoreSet(self, data=60):
+    """
+    Sets the ignoreflag for an amount of seconds
+    self._ignoreTill is a plugin flag that holds a time which ignoreCheck checks against  
+    """
+    self._ignoreTill = self.console.time() + data
+    return None
+
+  def ignoreDel(self):
+    self._ignoreTill = 0
+    return None
+  
+  def ignoreCheck(self):
+    """
+    Tests if the ignore flag is set, to disable certain automatic functions when unwanted
+    Returns True if the functionality should be ignored 
+    """
+    if self._ignoreTill - self.console.time() > 0:
+      return True
+    else:
+      return False
+
 
 #--Rcon commands------by:FSK405|Fear--------------------------------------------------------------
 # setnextmap <mapname>
