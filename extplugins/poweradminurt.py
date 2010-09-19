@@ -1,12 +1,12 @@
 #
-# PowerAdmin Plugin for BigBrotherBot(B3) (www.bigbrotherbot.com)
+# PowerAdmin Plugin for BigBrotherBot(B3) (www.bigbrotherbot.net)
 # Copyright (C) 2008 Mark Weirath (xlr8or@xlr8or.com)
 # 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation; either version 2 of the License, or
 # (at your option) any later version.
-
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
@@ -82,8 +82,11 @@
 # * debug !pamap and !pasetnextmap
 # * debug dictionnary use for !papublic
 # * !papublic can now use randnum even if dictionnary is not used
+# 20/09/2010 - 1.5.2 - Courgette
+# * debug !paslap and !panuke
+# * add tests
 
-__version__ = '1.5.1'
+__version__ = '1.5.2'
 __author__  = 'xlr8or'
 
 import b3, time, thread, threading, re
@@ -938,7 +941,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
       client.message('^7Invalid data, try !help paslap')
       return False
 
-    if len(input[1]):
+    if input[1]:
       try:
         x = int(input[1])
       except:
@@ -972,7 +975,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
       client.message('^7Invalid data, try !help panuke')
       return False
 
-    if len(input[1]):
+    if input[1]:
       try:
         x = int(input[1])
       except:
@@ -1047,6 +1050,11 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     
     if team == 'spec' or team == 'spectator':
       team = 's'
+    if team == 'b':
+      team = 'blue'
+    if team == 'r':
+      team = 'red'
+
     
     if team == 's':
       teamname = 'spectator'
@@ -2048,4 +2056,60 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
 
 
 if __name__ == '__main__':
-  print '\nThis is version '+__version__+' by '+__author__+' for BigBrotherBot.\n'
+    ############# setup test environment ##################
+    from b3.fake import FakeConsole, joe, superadmin
+    from b3.parsers.iourt41 import Iourt41Parser
+    from b3.config import XmlConfigParser
+    
+    ## inherits from both FakeConsole and Iourt41Parser
+    class FakeUrtConsole(FakeConsole, Iourt41Parser):
+        def getCvar(self, cvarName):
+            if self._reCvarName.match(cvarName):
+                #"g_password" is:"^7" default:"scrim^7"
+                val = self.writercon(cvarName)
+                self.debug('Get cvar %s = [%s]', cvarName, val)
+                if val is None:
+                    return None
+                #sv_mapRotation is:gametype sd map mp_brecourt map mp_carentan map mp_dawnville map mp_depot map mp_harbor map mp_hurtgen map mp_neuville map mp_pavlov map mp_powcamp map mp_railyard map mp_rocket map mp_stalingrad^7 default:^7
+    
+                for f in self._reCvar:
+                    m = re.match(f, val)
+                    if m:
+                        #self.debug('line matched %s' % f.pattern)
+                        break
+    
+                if m:
+                    #self.debug('m.lastindex %s' % m.lastindex)
+                    if m.group('cvar').lower() == cvarName.lower() and m.lastindex > 3:
+                        return b3.cvar.Cvar(m.group('cvar'), value=m.group('value'), default=m.group('default'))
+                    elif m.group('cvar').lower() == cvarName.lower():
+                        return b3.cvar.Cvar(m.group('cvar'), value=m.group('value'), default=m.group('value'))
+                else:
+                    return None
+        def writercon(self, msg, maxRetries=None):
+            """Write a message to Rcon/Console"""
+            outputrcon = b3.parsers.q3a_rcon.Rcon(self, (\
+                                 self.config.get('server', 'rcon_ip'), \
+                                 self.config.getint('server', 'port')), \
+                                 self.config.get('server', 'rcon_password'))
+            res = outputrcon.write(msg, maxRetries=maxRetries)
+            outputrcon.flush()
+            return res
+    
+    b3xml = XmlConfigParser()
+    b3xml.load('C:/Users/Thomas/workspace/b3/conf-urt-local/b3.xml')
+    fakeConsole = FakeUrtConsole(b3xml)
+    fakeConsole.startup()
+    
+    p = PoweradminurtPlugin(fakeConsole, config=os.path.dirname(__file__)+'/conf/poweradminurt.xml')
+    p.onStartup()
+    
+    ########################## ok lets test ###########################
+    
+    joe.connects(3)
+    superadmin.connects(1)
+    
+    superadmin.says('!slap joe')
+    superadmin.says('!slap joe 5')
+    
+    time.sleep(30)
