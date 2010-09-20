@@ -96,8 +96,11 @@
 # 20/09/2010 - 1.5.6 - Courgette
 # * debug !paslap and !panuke
 # * add tests
+# 20/09/2010 - 1.5.7 - BlackMamba
+# * fix !pamute - http://www.bigbrotherbot.net/forums/xlr-releases/poweradminurt-1-4-0-for-urban-terror!/msg15296/#msg15296
+#
 
-__version__ = '1.5.6'
+__version__ = '1.5.7'
 __author__  = 'xlr8or'
 
 import b3, time, thread, threading, re
@@ -919,7 +922,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
       client.message('^7Invalid data, try !help pamute')
       return False
 
-    if re.match('^([0-9]+)\s*$', input[1]):
+    if input[1] is not None and re.match('^([0-9]+)\s*$', input[1]):
       duration = int(input[1])
     else:
       duration = ''
