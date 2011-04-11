@@ -189,6 +189,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
 
     # get the admin plugin so we can register commands
     self._adminPlugin = self.console.getPlugin('admin')
+    self._statsPlugin = self.console.getPlugin('stats')
     if not self._adminPlugin:
       # something is wrong, can't start without admin plugin
       self.error('Could not find admin plugin')
@@ -743,6 +744,129 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
   def dumpEvent(self, event):
     self.debug('poweradminurt.dumpEvent -- Type %s, Client %s, Target %s, Data %s',
       event.type, event.client, event.target, event.data)
+
+  def _getScores(self, clients):
+    scores = {}
+    for c in clients:
+      if c.isvar(self._statsPlugin, 'kills'):
+        kills = int(c.var(self._statsPlugin, 'kills').value)
+      else:
+        kills = 0
+      if c.isvar(self._statsPlugin, 'deaths'):
+        deaths = int(c.var(self._statsPlugin, 'deaths').value)
+      else:
+        deaths = 0
+      score = kills/(1.0+deaths)
+      scores[c.id] = score
+    return scores
+
+  def _getRandomTeams(self, clients):
+    players = []
+    for c in clients:
+      # FIXME: if not c.isvar(self, 'paforced')
+      if c.team in (b3.TEAM_BLUE, b3.TEAM_RED):
+          players.append(c)
+    random.shuffle(players)
+    n = len(clients)/2
+    blue = players[:n]
+    red = players[n:]
+    return blue, red
+
+  def _getTeamScore(self, team, scores):
+    return sum(scores.get(c.id, 0.0) for c in team)
+
+  def _getTeamScoreDiff(self, blue, red, scores):
+    bluescore = self._getTeamScore(blue, scores)
+    redscore = self._getTeamScore(red, scores)
+    return abs(bluescore-redscore)
+
+  def cmd_pabalance(self, data, client, cmd=None):
+    if not self._statsPlugin:
+      return
+    clients = self.console.clients.getList()
+    scores = self._getScores(clients)
+    blue = [ c for c in clients if c.team == b3.TEAM_BLUE ]
+    red = [ c for c in clients if c.team == b3.TEAM_RED ]
+    bluescore = self._getTeamScore(blue, scores)
+    redscore = self._getTeamScore(red, scores)
+    diff = self._getTeamScoreDiff(blue, red, scores)
+    self.console.write('bigtext "| %.2f - %.2f | = %.2f"' % (
+      bluescore, redscore, diff))
+
+  def cmd_paunskuffle(self, data, client, cmd=None):
+    if not self._statsPlugin:
+      return
+    clients = self.console.clients.getList()
+    scores = self._getScores(clients)
+    decorated = [ (scores.get(c.id, 0), c) for c in clients ]
+    decorated.sort()
+    players = [ c for score, c in decorated ]
+    n = len(players)/2
+    blue = players[:n]
+    red = players[n:]
+    self._move(blue, red)
+
+  def cmd_paskuffle(self, data, client, cmd=None):
+    if not self._statsPlugin:
+      return
+    clients = self.console.clients.getList()
+    scores = self._getScores(clients)
+    oldblue = [ c for c in clients if c.team == b3.TEAM_BLUE ]
+    oldred = [ c for c in clients if c.team == b3.TEAM_RED ]
+    olddiff = self._getTeamScoreDiff(oldblue, oldred, scores)
+    bestdiff, bestblue, bestred = None, None, None
+    for _ in xrange(100):
+      blue, red = self._getRandomTeams(clients)
+      diff = self._getTeamScoreDiff(blue, red, scores)
+      if bestdiff is None or diff < bestdiff:
+        bestdiff, bestblue, bestred = diff, blue, red
+    self.console.write('bigtext Skuffling!')
+    self._move(bestblue, bestred)
+    self.console.write('say Old diff %.2f, new diff %.2f' % (olddiff, bestdiff))
+
+  def _move(self, blue, red):
+    if not blue and not red:
+      return
+    for a, b in map(None, blue, red):
+      if a and a.team != b3.TEAM_BLUE:
+        self.console.write('say Moving %s to blue' % a.name)
+        self.console.write('forceteam %s blue' % a.cid)
+      if b and b.team != b3.TEAM_RED:
+        self.console.write('say Moving %s to red' % b.name)
+        self.console.write('forceteam %s red' % b.cid)
+
+  def cmd_paminmoves(self, data, client, cmd=None):
+    if not self._statsPlugin:
+      return
+    clients = self.console.clients.getList()
+    scores = self._getScores(clients)
+    oldblue = [ c for c in clients if c.team == b3.TEAM_BLUE ]
+    oldred = [ c for c in clients if c.team == b3.TEAM_RED ]
+    n = len(oldblue) + len(oldred)
+    olddiff = self._getTeamScoreDiff(oldblue, oldred, scores)
+    bestdiff, bestblue, bestred = None, None, None
+    for _ in xrange(500):
+      blue, red = self._getRandomTeams(clients)
+      m = self._countMoves(oldblue, blue) + self._countMoves(oldred, red)
+      if m > max(2, n/3):
+        continue
+      diff = self._getTeamScoreDiff(blue, red, scores)
+      if bestdiff is None or diff < bestdiff:
+        bestdiff, bestblue, bestred = diff, blue, red
+    if bestdiff:
+      self.console.write('bigtext Minmoving!')
+      self._move(bestblue, bestred)
+      self.console.write('say Old diff %.2f, new diff %.2f' % (olddiff, bestdiff))
+    else:
+      self.cmd_paskuffle(data, client, cmd)
+
+  def _countMoves(self, old, new):
+    i = 0
+    newnames = [ c.name for c in new ]
+    for c in old:
+      if c.name not in newnames:
+        i += 1
+    return i
 
 #--Commands implementation ------------------------------------------------------------------------
 # /rcon commands:
@@ -2160,3 +2284,4 @@ if __name__ == '__main__':
     superadmin.says('!slap joe 5')
     
     time.sleep(30)
+

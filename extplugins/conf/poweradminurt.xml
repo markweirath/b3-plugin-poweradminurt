@@ -19,6 +19,10 @@
 		<set name="paexec">100</set>
 
 		<set name="pateams-teams">2</set>
+		<set name="paskuffle-sk">2</set>
+		<set name="paunskuffle-unsk">2</set>
+		<set name="pabalance-bal">2</set>
+		<set name="paminmoves-min">2</set>
 
 		<set name="pamoon-moon">20</set>
 
