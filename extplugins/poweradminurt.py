@@ -189,7 +189,6 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
 
     # get the admin plugin so we can register commands
     self._adminPlugin = self.console.getPlugin('admin')
-    self._statsPlugin = self.console.getPlugin('stats')
     if not self._adminPlugin:
       # something is wrong, can't start without admin plugin
       self.error('Could not find admin plugin')
@@ -219,6 +218,8 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     self.registerEvent(b3.events.EVT_CLIENT_TEAM_CHANGE)
     self.registerEvent(b3.events.EVT_CLIENT_DAMAGE)
     self.registerEvent(b3.events.EVT_CLIENT_NAME_CHANGE)
+    self.registerEvent(b3.events.EVT_CLIENT_KILL)
+    self.registerEvent(b3.events.EVT_CLIENT_KILL_TEAM)
 
     # don't run cron-checks on startup
     self.ignoreSet(60)
@@ -737,39 +738,62 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
       # recount players
     elif event.type == b3.events.EVT_CLIENT_NAME_CHANGE:
       self.onNameChange(event.data, event.client)
-
+    elif event.type == b3.events.EVT_CLIENT_KILL:
+      self.onKill(event.client, event.target, int(event.data[0]))
+    elif event.type == b3.events.EVT_CLIENT_KILL_TEAM:
+      self.onKillTeam(event.client, event.target, int(event.data[0]))
     else:
       self.dumpEvent(event)
 
+  def onKill(self, killer, victim, points):
+    killer.var(self, 'kills', 0).value  += 1
+    victim.var(self, 'deaths', 0).value += 1
+    
+  def onTeamKill(self, killer, victim, points):
+    killer.var(self, 'teamkills', 0).value += 1
+    
   def dumpEvent(self, event):
     self.debug('poweradminurt.dumpEvent -- Type %s, Client %s, Target %s, Data %s',
       event.type, event.client, event.target, event.data)
 
   def _getScores(self, clients):
     scores = {}
+    xlrstats = self.console.getPlugin('xlrstats')
+    cutoff = 300.0 # seconds
     for c in clients:
-      if c.isvar(self._statsPlugin, 'kills'):
-        kills = int(c.var(self._statsPlugin, 'kills').value)
-      else:
-        kills = 0
-      if c.isvar(self._statsPlugin, 'deaths'):
-        deaths = int(c.var(self._statsPlugin, 'deaths').value)
-      else:
-        deaths = 0
-      score = kills/(1.0+deaths)
+      age = self.console.time() - c.var(self, 'teamtime', 0).value
+      kills = c.var(self, 'kills', 0).value
+      deaths = c.var(self, 'deaths', 0).value
+      teamkills = c.var(self, 'teamkills', 0).value
+      score = kills/(1.0+deaths+teamkills)
+      # if available, use xlrstats if the client switched teams recently
+      if age < cutoff and xlrstats:
+        stats = xlrstats.get_PlayerStats(c)
+        if stats:
+          weight = age > cutoff and 1.0 or age/cutoff
+          score = weight*score + (1.0-weight)*stats.ratio
       scores[c.id] = score
     return scores
 
-  def _getRandomTeams(self, clients):
-    players = []
+  def _getRandomTeams(self, clients, checkforced=False):
+    blue = []
+    red = []
+    nonforced = []
     for c in clients:
-      # FIXME: if not c.isvar(self, 'paforced')
+      # ignore spectators
       if c.team in (b3.TEAM_BLUE, b3.TEAM_RED):
-          players.append(c)
-    random.shuffle(players)
-    n = len(clients)/2
-    blue = players[:n]
-    red = players[n:]
+          if checkforced and c.isvar(self, 'paforced'):
+            if c.team == b3.TEAM_BLUE:
+              blue.append(c)
+            else:
+              red.append(c)
+          else:
+            nonforced.append(c)
+    # distribute nonforced players
+    random.shuffle(nonforced)
+    n = (len(nonforced)+len(blue)+len(red))/2 - len(blue)
+    blue.extend(nonforced[:n])
+    red.extend(nonforced[n:])
     return blue, red
 
   def _getTeamScore(self, team, scores):
@@ -778,66 +802,79 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
   def _getTeamScoreDiff(self, blue, red, scores):
     bluescore = self._getTeamScore(blue, scores)
     redscore = self._getTeamScore(red, scores)
-    return abs(bluescore-redscore)
-
+    return bluescore-redscore
+    
   def cmd_pabalance(self, data, client, cmd=None):
-    if not self._statsPlugin:
-      return
+    """\
+    Report team skill balance.
+    """
     clients = self.console.clients.getList()
     scores = self._getScores(clients)
     blue = [ c for c in clients if c.team == b3.TEAM_BLUE ]
     red = [ c for c in clients if c.team == b3.TEAM_RED ]
-    bluescore = self._getTeamScore(blue, scores)
-    redscore = self._getTeamScore(red, scores)
     diff = self._getTeamScoreDiff(blue, red, scores)
-    self.console.write('bigtext "| %.2f - %.2f | = %.2f"' % (
-      bluescore, redscore, diff))
-
+    team = diff < 0 and 'red' or 'blue'
+    self.console.write('say Team skill difference is %.2f (%s is stronger)' % (
+      diff, team))
+      
   def cmd_paunskuffle(self, data, client, cmd=None):
-    if not self._statsPlugin:
-      return
+    """\
+    Create unbalanced teams. Used to test !paskuffle and !paminmoves.
+    """
     clients = self.console.clients.getList()
     scores = self._getScores(clients)
-    decorated = [ (scores.get(c.id, 0), c) for c in clients ]
+    decorated = [ (scores.get(c.id, 0), c) for c in clients 
+                    if c.team in (b3.TEAM_BLUE, b3.TEAM_RED) ]
     decorated.sort()
     players = [ c for score, c in decorated ]
     n = len(players)/2
     blue = players[:n]
     red = players[n:]
+    self.console.write('bigtext "Unskuffling! Noobs beware!"')
     self._move(blue, red)
 
   def cmd_paskuffle(self, data, client, cmd=None):
-    if not self._statsPlugin:
-      return
+    """\
+    Skill shuffle. Shuffle players to balanced teams by numbers and skill.
+    Locked players are also moved.
+    """
     clients = self.console.clients.getList()
     scores = self._getScores(clients)
     oldblue = [ c for c in clients if c.team == b3.TEAM_BLUE ]
     oldred = [ c for c in clients if c.team == b3.TEAM_RED ]
     olddiff = self._getTeamScoreDiff(oldblue, oldred, scores)
     bestdiff, bestblue, bestred = None, None, None
+    # randomize teams a few times and pick the most balanced
     for _ in xrange(100):
       blue, red = self._getRandomTeams(clients)
       diff = self._getTeamScoreDiff(blue, red, scores)
-      if bestdiff is None or diff < bestdiff:
+      if bestdiff is None or abs(diff) < abs(bestdiff):
         bestdiff, bestblue, bestred = diff, blue, red
-    self.console.write('bigtext Skuffling!')
-    self._move(bestblue, bestred)
-    self.console.write('say Old diff %.2f, new diff %.2f' % (olddiff, bestdiff))
-
+    if bestdiff is not None:
+        self.console.write('bigtext "Skuffling!"')
+        self._move(bestblue, bestred)
+        self.console.write('say Team skill difference was %.2f, is now %.2f' % (
+          olddiff, bestdiff))
+    else:
+        self.console.write('say Cannot improve team balance!')
+  
   def _move(self, blue, red):
     if not blue and not red:
       return
+    oldvalue = self._team_change_force_balance_enable
+    self._team_change_force_balance_enable = False
     for a, b in map(None, blue, red):
       if a and a.team != b3.TEAM_BLUE:
-        self.console.write('say Moving %s to blue' % a.name)
         self.console.write('forceteam %s blue' % a.cid)
       if b and b.team != b3.TEAM_RED:
-        self.console.write('say Moving %s to red' % b.name)
         self.console.write('forceteam %s red' % b.cid)
+    self._team_change_force_balance_enable = oldvalue
 
   def cmd_paminmoves(self, data, client, cmd=None):
-    if not self._statsPlugin:
-      return
+    """\
+    Move as few players as needed to create teams balanced by numbers AND skill.
+    Locked players are not moved.
+    """
     clients = self.console.clients.getList()
     scores = self._getScores(clients)
     oldblue = [ c for c in clients if c.team == b3.TEAM_BLUE ]
@@ -845,19 +882,24 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     n = len(oldblue) + len(oldred)
     olddiff = self._getTeamScoreDiff(oldblue, oldred, scores)
     bestdiff, bestblue, bestred = None, None, None
-    for _ in xrange(500):
-      blue, red = self._getRandomTeams(clients)
+    # randomize teams a few times and pick the most balanced
+    for _ in xrange(100):
+      blue, red = self._getRandomTeams(clients, checkforced=True)
       m = self._countMoves(oldblue, blue) + self._countMoves(oldred, red)
+      # always allow at least 2 moves, but don't move more than a third
+      # of the players
       if m > max(2, n/3):
         continue
       diff = self._getTeamScoreDiff(blue, red, scores)
-      if bestdiff is None or diff < bestdiff:
+      if bestdiff is None or abs(diff) < abs(bestdiff):
         bestdiff, bestblue, bestred = diff, blue, red
-    if bestdiff:
+    if bestdiff is not None:
       self.console.write('bigtext Minmoving!')
       self._move(bestblue, bestred)
-      self.console.write('say Old diff %.2f, new diff %.2f' % (olddiff, bestdiff))
+      self.console.write('say Team skill difference was %.2f, is now %.2f' % (
+        olddiff, bestdiff))
     else:
+      # we couldn't beat the previous diff by moving only a few players, do a full skuffle
       self.cmd_paskuffle(data, client, cmd)
 
   def _countMoves(self, old, new):
