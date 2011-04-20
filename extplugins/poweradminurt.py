@@ -861,14 +861,12 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
   def _move(self, blue, red):
     if not blue and not red:
       return
-    oldvalue = self._team_change_force_balance_enable
-    self._team_change_force_balance_enable = False
+    self.ignoreSet(60)
     for a, b in map(None, blue, red):
       if a and a.team != b3.TEAM_BLUE:
         self.console.write('forceteam %s blue' % a.cid)
       if b and b.team != b3.TEAM_RED:
         self.console.write('forceteam %s red' % b.cid)
-    self._team_change_force_balance_enable = oldvalue
 
   def cmd_paminmoves(self, data, client, cmd=None):
     """\
