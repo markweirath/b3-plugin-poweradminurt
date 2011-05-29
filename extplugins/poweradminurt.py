@@ -814,7 +814,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     red = [ c for c in clients if c.team == b3.TEAM_RED ]
     diff = self._getTeamScoreDiff(blue, red, scores)
     team = diff < 0 and 'red' or 'blue'
-    self.console.write('say Team skill difference is %.2f (%s is stronger)' % (
+    self.console.write('^4Team skill difference is ^1%.2f (%s is stronger)' % (
       diff, team))
       
   def cmd_paunskuffle(self, data, client, cmd=None):
@@ -851,12 +851,12 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
       if bestdiff is None or abs(diff) < abs(bestdiff):
         bestdiff, bestblue, bestred = diff, blue, red
     if bestdiff is not None:
-        self.console.write('bigtext "Skuffling!"')
+        self.console.write('bigtext "Skill Shuffle in Progress!"')
         self._move(bestblue, bestred)
-        self.console.write('say Team skill difference was %.2f, is now %.2f' % (
+        self.console.write('^4Team skill difference was ^1%.2f^4, is now ^1%.2f' % (
           olddiff, bestdiff))
     else:
-        self.console.write('say Cannot improve team balance!')
+        self.console.write('^1Cannot improve team balance!')
   
   def _move(self, blue, red):
     if not blue and not red:
@@ -894,7 +894,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     if bestdiff is not None:
       self.console.write('bigtext Minmoving!')
       self._move(bestblue, bestred)
-      self.console.write('say Team skill difference was %.2f, is now %.2f' % (
+      self.console.write('^4Team skill difference was ^1%.2f^4, is now ^1%.2f' % (
         olddiff, bestdiff))
     else:
       # we couldn't beat the previous diff by moving only a few players, do a full skuffle
@@ -907,6 +907,58 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
       if c.name not in newnames:
         i += 1
     return i
+
+  def cmd_bbswap(self, data, client, cmd=None):
+    """\
+    <player1> [player2] - Swap two teams for 2 clients. If player2 is not specified, the admin
+    using the command is swapped with player1. Doesn't work with spectators (exception for calling admin).
+    """
+    #Check the input
+    input = self._adminPlugin.parseUserCmd(data)
+    #Check for input. If none, exist with a message.
+    if input:
+      #Check if the first player exists. If none, exit.   
+      client1 = self._adminPlugin.findClientPrompt(input[0], client)
+      if not client1:
+        return False
+    else:
+      client.message("Invalid parameters, try !swap client1 [client2]")
+      return False
+    #Check if there's a second, valid input. If no input, mark the admin to be changed.
+    #If the specified player doesn't exist, exit.
+    if input[1] is not None:
+      client2 = self._adminPlugin.findClientPrompt(input[1], client)                              
+      if not client2:
+        return False
+    else:
+      client2 = client
+    if client1.team == b3.TEAM_SPEC:
+      client.message("%s is a spectator! - Can't be Swaped" % (client1.name))
+      return False
+    if client2.team == b3.TEAM_SPEC:
+      client.message("%s is a spectator! - Can't be Swaped" % (client2.name))
+      return False
+    if client1.team == client2.team:
+      client.message("%s and %s are on the same team! - Nice Try :p" % ((client1.name), client2.name))
+      return False
+    if client1.team == b3.TEAM_RED:
+      team1 = "blue"
+      team2 = "red"
+    else:
+      team1 = "red"
+      team2 = "blue"
+    self.console.write("forceteam %s spectator" % (client1.name))
+    self.console.write("forceteam %s spectator" % (client2.name))	
+    self.console.write("forceteam %s %s" % ((client1.name), team1))
+    self.console.write("forceteam %s %s" % ((client2.name), team2))	
+    # No need to send the message twice to the switching admin :-)
+    if (client1 != client):
+      client1.message("^4You were swapped with %s by the admin." % (client2.name))
+    if (client2 != client):
+      client2.message("^4You were swapped with %s by the admin." % (client1.name))
+    client.message("^3Successfully swapped %s and %s." % (client1.name, client2.name))
+    return True
+
 
 #--Commands implementation ------------------------------------------------------------------------
 # /rcon commands:
