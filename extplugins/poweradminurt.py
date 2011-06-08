@@ -230,7 +230,11 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     self._balancing = False
 
     # save original vote settings
-    self._origvote = self.console.getCvar('g_allowvote').getInt()
+    try:
+        self._origvote = self.console.getCvar('g_allowvote').getInt()
+    except:
+        self._origvote = 0 # no votes
+
     # if by any chance on botstart g_allowvote is 0, we'll use the default UrT value
     if self._origvote == 0:
       self._origvote = 536871039
