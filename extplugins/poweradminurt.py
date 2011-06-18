@@ -850,23 +850,59 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
       diff = self._getTeamScoreDiff(blue, red, scores)
       if bestdiff is None or abs(diff) < abs(bestdiff):
         bestdiff, bestblue, bestred = diff, blue, red
+    moves = 0
     if bestdiff is not None:
         self.console.write('bigtext "Skill Shuffle in Progress!"')
-        self._move(bestblue, bestred)
+        moves = self._move(bestblue, bestred)
+    if moves:
         self.console.write('^4Team skill difference was ^1%.2f^4, is now ^1%.2f' % (
           olddiff, bestdiff))
     else:
         self.console.write('^1Cannot improve team balance!')
   
+
   def _move(self, blue, red):
+    # Filter out players already in correct team
+    blue = [ c for c in blue if c.team != b3.TEAM_BLUE ]
+    red = [ c for c in red if c.team != b3.TEAM_RED ]
+
     if not blue and not red:
-      return
+      return 0
+
+    clients = self.console.clients.getList()
+    numblue = len([ c for c in clients if c.team == b3.TEAM_BLUE ])
+    numred = len([ c for c in clients if c.team == b3.TEAM_RED ])
     self.ignoreSet(60)
-    for a, b in map(None, blue, red):
-      if a and a.team != b3.TEAM_BLUE:
-        self.console.write('forceteam %s blue' % a.cid)
-      if b and b.team != b3.TEAM_RED:
-        self.console.write('forceteam %s red' % b.cid)
+
+    # We have to make sure we don't get a "too many players" error from the
+    # server when we move the players. Start moving from the team with most
+    # players. If the teams are equal in numbers, temporarily put one player in
+    # spec mode.
+    moves = len(blue) + len(red)
+    spec = None
+
+    if blue and numblue == numred:
+        random.shuffle(blue)
+        spec = blue.pop()
+        self.console.write('forceteam %s spectate' % spec.cid)
+        numblue -= 1
+
+    for _ in xrange(moves):
+        if blue and (len(blue) > len(red) or numblue < numred):
+            c = blue.pop()
+            self.console.write('forceteam %s blue' % c.cid)
+            numblue += 1
+            numred -= 1
+        elif red:
+            c = red.pop()
+            self.console.write('forceteam %s red' % c.cid)
+            numblue -= 1
+            numred += 1
+
+    if spec:
+        self.console.write('forceteam %s blue' % spec.cid)
+
+    return moves
 
   def cmd_paminmoves(self, data, client, cmd=None):
     """\
