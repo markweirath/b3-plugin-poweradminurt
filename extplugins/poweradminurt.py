@@ -759,19 +759,25 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
   def _getScores(self, clients):
     scores = {}
     xlrstats = self.console.getPlugin('xlrstats')
-    cutoff = 300.0 # seconds
     for c in clients:
-      age = self.console.time() - c.var(self, 'teamtime', 0).value
-      kills = c.var(self, 'kills', 0).value
-      deaths = c.var(self, 'deaths', 0).value
-      teamkills = c.var(self, 'teamkills', 0).value
-      score = kills/(1.0+deaths+teamkills)
-      # if available, use xlrstats if the client switched teams recently
-      if age < cutoff and xlrstats:
-        stats = xlrstats.get_PlayerStats(c)
-        if stats:
-          weight = age > cutoff and 1.0 or age/cutoff
-          score = weight*score + (1.0-weight)*stats.ratio
+      if not c.isvar(self, 'teamtime'):
+          c.setvar(self, 'teamtime', self.console.time())
+      age = (self.console.time() - c.var(self, 'teamtime', 0).value)/60.0
+      kills = max(0, c.var(self, 'kills', 0).value)
+      deaths = max(0, c.var(self, 'deaths', 0).value)
+      teamkills = max(0, c.var(self, 'teamkills', 0).value)
+      hs = c.var(self, 'headhits', 0).value + c.var(self, 'helmethits', 0).value
+      T = min(1.0, age/5.0) # reduce score for players who just joined
+      hsratio = T*min(1.0, hs/(1.0+kills)) # hs can be greater than kills
+      score = T*kills/(1.0+deaths+teamkills) + T*(kills-deaths-teamkills)/(age+1.0)
+      stats = xlrstats.get_PlayerStats(c)
+      if stats:
+        head = xlrstats.get_PlayerBody(playerid=c.cid, bodypartid=0).kills
+        helmet = xlrstats.get_PlayerBody(playerid=c.cid, bodypartid=1).kills
+        xhsratio = min(1.0, (head + helmet)/(1.0+kills))
+        score += 0.5*hsratio + 0.5*xhsratio + stats.ratio
+      else:
+        score += hsratio + 0.8
       scores[c.id] = score
     return scores
 
@@ -843,13 +849,15 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     oldblue = [ c for c in clients if c.team == b3.TEAM_BLUE ]
     oldred = [ c for c in clients if c.team == b3.TEAM_RED ]
     olddiff = self._getTeamScoreDiff(oldblue, oldred, scores)
-    bestdiff, bestblue, bestred = None, None, None
+    bestdiff = bestsniperdiff = bestblue = bestred = None
     # randomize teams a few times and pick the most balanced
+    slack = 0.4
     for _ in xrange(100):
       blue, red = self._getRandomTeams(clients)
       diff = self._getTeamScoreDiff(blue, red, scores)
-      if bestdiff is None or abs(diff) < abs(bestdiff):
-        bestdiff, bestblue, bestred = diff, blue, red
+      sniperdiff = abs(self._countSnipers(blue) - self._countSnipers(red))
+      if bestdiff is None or (max(0, abs(diff)-slack), sniperdiff) < (max(0, abs(bestdiff)-slack), bestsniperdiff):
+        bestdiff, bestsniperdiff, bestblue, bestred = diff, sniperdiff, blue, red
     moves = 0
     if bestdiff is not None:
         self.console.write('bigtext "Skill Shuffle in Progress!"')
@@ -860,6 +868,13 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     else:
         self.console.write('^1Cannot improve team balance!')
   
+  def _countSnipers(self, team):
+    n = 0
+    for c in team:
+      # Count players with SR8
+      if 'Z' in getattr(c, 'gear', ''):
+        n += 1
+    return n
 
   def _move(self, blue, red):
     # Filter out players already in correct team
@@ -915,7 +930,8 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     oldred = [ c for c in clients if c.team == b3.TEAM_RED ]
     n = len(oldblue) + len(oldred)
     olddiff = self._getTeamScoreDiff(oldblue, oldred, scores)
-    bestdiff, bestblue, bestred = None, None, None
+    bestdiff = bestsniperdiff = bestblue = bestred = None
+    slack = 0.4
     # randomize teams a few times and pick the most balanced
     for _ in xrange(100):
       blue, red = self._getRandomTeams(clients, checkforced=True)
@@ -925,8 +941,9 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
       if m > max(2, n/3):
         continue
       diff = self._getTeamScoreDiff(blue, red, scores)
-      if bestdiff is None or abs(diff) < abs(bestdiff):
-        bestdiff, bestblue, bestred = diff, blue, red
+      sniperdiff = abs(self._countSnipers(blue) - self._countSnipers(red))
+      if bestdiff is None or (max(0, abs(diff)-slack), sniperdiff) < (max(0, abs(bestdiff)-slack), bestsniperdiff):
+        bestdiff, bestsniperdiff, bestblue, bestred = diff, sniperdiff, blue, red
     if bestdiff is not None:
       self.console.write('bigtext Minmoving!')
       self._move(bestblue, bestred)
