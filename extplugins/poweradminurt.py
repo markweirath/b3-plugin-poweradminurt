@@ -776,8 +776,10 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
         helmet = xlrstats.get_PlayerBody(playerid=c.cid, bodypartid=1).kills
         xhsratio = min(1.0, (head + helmet)/(1.0+kills))
         score += 0.5*hsratio + 0.5*xhsratio + stats.ratio
+        self.debug('score: %s %s score=%.2f age=%.2f kills=%s deaths=%s hs=%s hsr=%.2f xhsr=%.2f' % (c.team, c.name, score, age, kills, deaths, hs, hsratio, xhsratio))
       else:
         score += hsratio + 0.8
+        self.debug('score: %s %s score=%.2f age=%.2f kills=%s deaths=%s hs=%s hsratio=%.2f' % (c.team, c.name, score, age, kills, deaths, hs, hsratio))
       scores[c.id] = score
     return scores
 
@@ -844,24 +846,17 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     Skill shuffle. Shuffle players to balanced teams by numbers and skill.
     Locked players are also moved.
     """
-    clients = self.console.clients.getList()
-    scores = self._getScores(clients)
-    oldblue = [ c for c in clients if c.team == b3.TEAM_BLUE ]
-    oldred = [ c for c in clients if c.team == b3.TEAM_RED ]
-    olddiff = self._getTeamScoreDiff(oldblue, oldred, scores)
-    bestdiff = bestsniperdiff = bestblue = bestred = None
-    # randomize teams a few times and pick the most balanced
-    slack = 0.4
-    for _ in xrange(100):
-      blue, red = self._getRandomTeams(clients)
-      diff = self._getTeamScoreDiff(blue, red, scores)
-      sniperdiff = abs(self._countSnipers(blue) - self._countSnipers(red))
-      if bestdiff is None or (max(0, abs(diff)-slack), sniperdiff) < (max(0, abs(bestdiff)-slack), bestsniperdiff):
-        bestdiff, bestsniperdiff, bestblue, bestred = diff, sniperdiff, blue, red
+    olddiff, bestdiff, blue, red = self._randTeams(100, 1.0)
+    if (client.team == b3.TEAM_BLUE and \
+        client.cid not in [ c.cid for c in blue ]) or \
+       (client.team == b3.TEAM_RED and \
+        client.cid not in [ c.cid for c in red ]):
+       # don't move player who initiated skuffle
+       blue, red = red, blue
     moves = 0
     if bestdiff is not None:
         self.console.write('bigtext "Skill Shuffle in Progress!"')
-        moves = self._move(bestblue, bestred)
+        moves = self._move(blue, red)
     if moves:
         self.console.write('^4Team skill difference was ^1%.2f^4, is now ^1%.2f' % (
           olddiff, bestdiff))
@@ -877,6 +872,9 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     return n
 
   def _move(self, blue, red):
+    self.debug('move: final blue team: ' + ' '.join(c.name for c in blue))
+    self.debug('move: final red team: ' + ' '.join(c.name for c in red))
+
     # Filter out players already in correct team
     blue = [ c for c in blue if c.team != b3.TEAM_BLUE ]
     red = [ c for c in red if c.team != b3.TEAM_RED ]
@@ -887,7 +885,8 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     clients = self.console.clients.getList()
     numblue = len([ c for c in clients if c.team == b3.TEAM_BLUE ])
     numred = len([ c for c in clients if c.team == b3.TEAM_RED ])
-    self.ignoreSet(60)
+    self.debug('move: num players: blue=%d red=%d' % (numblue, numred))
+    self.ignoreSet(30)
 
     # We have to make sure we don't get a "too many players" error from the
     # server when we move the players. Start moving from the team with most
@@ -895,27 +894,35 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     # spec mode.
     moves = len(blue) + len(red)
     spec = None
+    self.debug('move: need to do %d moves' % moves)
+    self.debug('move: will go to blue team: ' + ' '.join(c.name for c in blue))
+    self.debug('move: will go to red team: ' + ' '.join(c.name for c in red))
 
     if blue and numblue == numred:
         random.shuffle(blue)
         spec = blue.pop()
         self.console.write('forceteam %s spectate' % spec.cid)
-        numblue -= 1
+        numred -= 1
+        moves -= 1
+        self.debug('move: moved %s from red to spec' % spec.name)
 
     for _ in xrange(moves):
-        if blue and (len(blue) > len(red) or numblue < numred):
+        if (blue and numblue < numred) or (blue and not red):
             c = blue.pop()
             self.console.write('forceteam %s blue' % c.cid)
             numblue += 1
             numred -= 1
+            self.debug('move: moved %s to blue' % c.name)
         elif red:
             c = red.pop()
             self.console.write('forceteam %s red' % c.cid)
             numblue -= 1
             numred += 1
+            self.debug('move: moved %s to red' % c.name)
 
     if spec:
         self.console.write('forceteam %s blue' % spec.cid)
+        self.debug('move: moved %s from spec to blue' % spec.name)
 
     return moves
 
@@ -924,26 +931,12 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     Move as few players as needed to create teams balanced by numbers AND skill.
     Locked players are not moved.
     """
-    clients = self.console.clients.getList()
-    scores = self._getScores(clients)
-    oldblue = [ c for c in clients if c.team == b3.TEAM_BLUE ]
-    oldred = [ c for c in clients if c.team == b3.TEAM_RED ]
-    n = len(oldblue) + len(oldred)
-    olddiff = self._getTeamScoreDiff(oldblue, oldred, scores)
-    bestdiff = bestsniperdiff = bestblue = bestred = None
-    slack = 0.4
-    # randomize teams a few times and pick the most balanced
-    for _ in xrange(100):
-      blue, red = self._getRandomTeams(clients, checkforced=True)
-      m = self._countMoves(oldblue, blue) + self._countMoves(oldred, red)
-      # always allow at least 2 moves, but don't move more than a third
-      # of the players
-      if m > max(2, n/3):
-        continue
-      diff = self._getTeamScoreDiff(blue, red, scores)
-      sniperdiff = abs(self._countSnipers(blue) - self._countSnipers(red))
-      if bestdiff is None or (max(0, abs(diff)-slack), sniperdiff) < (max(0, abs(bestdiff)-slack), bestsniperdiff):
-        bestdiff, bestsniperdiff, bestblue, bestred = diff, sniperdiff, blue, red
+    if self.ignoreCheck():
+      return
+    # always allow at least 2 moves, but don't move more than 30% of the
+    # players
+    olddiff, bestdiff, bestblue, bestred = \
+      self._randTeams(100, 1.0, 0.3)
     if bestdiff is not None:
       self.console.write('bigtext Minmoving!')
       self._move(bestblue, bestred)
@@ -952,6 +945,61 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     else:
       # we couldn't beat the previous diff by moving only a few players, do a full skuffle
       self.cmd_paskuffle(data, client, cmd)
+
+  def _randTeams(self, times, slack, maxmovesperc=None):
+    # randomize teams a few times and pick the most balanced
+    clients = self.console.clients.getList()
+    scores = self._getScores(clients)
+    oldblue = [ c for c in clients if c.team == b3.TEAM_BLUE ]
+    oldred = [ c for c in clients if c.team == b3.TEAM_RED ]
+    n = len(oldblue) + len(oldred)
+    olddiff = self._getTeamScoreDiff(oldblue, oldred, scores)
+    self.debug('rand: n=%s' % n)
+    self.debug('rand: olddiff=%.2f' % olddiff)
+    bestdiff = None # best balance diff so far when diff > slack
+    sbestdiff = None # best balance diff so far when diff < slack
+    bestnumdiff = None # best difference in number of snipers so far
+    bestblue = bestred = None # best teams so far when diff > slack
+    sbestblue = sbestred = None # new teams so far when diff < slack
+    epsilon = 0.0001
+    for _ in xrange(times):
+      blue, red = self._getRandomTeams(clients, checkforced=True)
+      m = self._countMoves(oldblue, blue) + self._countMoves(oldred, red)
+      if maxmovesperc and m > max(2, int(round(maxmovesperc*n))):
+        continue
+      diff = self._getTeamScoreDiff(blue, red, scores)
+      if abs(diff) <= slack:
+        # balance below slack threshold, try to distribute the snipers instead
+        numdiff = abs(self._countSnipers(blue) - self._countSnipers(red))
+        if bestnumdiff is None or numdiff < bestnumdiff:
+          # got better sniper num diff
+          if bestnumdiff is None:
+            self.debug('rand: first numdiff %d (sdiff=%.2f)' % (numdiff, diff))
+          else:
+            self.debug('rand: found better numdiff %d < %d (sdiff=%.2f)' % (numdiff, bestnumdiff, diff))
+          sbestblue, sbestred = blue, red
+          sbestdiff, bestnumdiff = diff, numdiff
+        elif numdiff == bestnumdiff and abs(diff) < abs(sbestdiff)-epsilon:
+          # same number of snipers but better balance diff
+          self.debug('rand: found better sdiff %.2f < %.2f (numdiff=%d bestnumdiff=%d)' % (abs(diff), abs(sbestdiff), numdiff, bestnumdiff))
+          sbestblue, sbestred = blue, red
+          sbestdiff = diff
+      elif bestdiff is None or abs(diff) < abs(bestdiff)-epsilon:
+        # balance above slack threshold
+        if bestdiff is None:
+          self.debug('rand: first diff %.2f' % abs(diff))
+        else:
+          self.debug('rand: found better diff %.2f < %.2f' % (abs(diff), abs(bestdiff)))
+        bestblue, bestred = blue, red
+        bestdiff = diff
+    if bestdiff is not None:
+      self.debug('rand: bestdiff=%.2f' % bestdiff)
+    if sbestdiff is not None:
+      self.debug('rand: sbestdiff=%.2f bestnumdiff=%d' % (sbestdiff, bestnumdiff))
+      self.debug('rand: snipers: blue=%d red=%d' % \
+        (self._countSnipers(sbestblue), self._countSnipers(sbestred)))
+      return olddiff, sbestdiff, sbestblue, sbestred
+    return olddiff, bestdiff, bestblue, bestred
 
   def _countMoves(self, old, new):
     i = 0
