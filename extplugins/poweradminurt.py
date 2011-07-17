@@ -792,12 +792,15 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
       T = min(1.0, age/5.0) # reduce score for players who just joined
       hsratio = T*min(1.0, hs/(1.0+kills)) # hs can be greater than kills
       score = T*kills/(1.0+deaths+teamkills) + T*(kills-deaths-teamkills)/(age+1.0)
-      stats = xlrstats.get_PlayerStats(c)
-      if stats:
-        head = xlrstats.get_PlayerBody(playerid=c.cid, bodypartid=0).kills
-        helmet = xlrstats.get_PlayerBody(playerid=c.cid, bodypartid=1).kills
-        xhsratio = min(1.0, (head + helmet)/(1.0+kills))
-        score += 0.5*hsratio + 0.5*xhsratio + stats.ratio
+      if xlrstats:
+        stats = xlrstats.get_PlayerStats(c)
+        if stats:
+          head = xlrstats.get_PlayerBody(playerid=c.cid, bodypartid=0).kills
+          helmet = xlrstats.get_PlayerBody(playerid=c.cid, bodypartid=1).kills
+          xhsratio = min(1.0, (head + helmet)/(1.0+kills))
+          score += 0.5*hsratio + 0.5*xhsratio + stats.ratio
+        else:
+          score += hsratio + 0.8
       else:
         score += hsratio + 0.8
       scores[c.id] = score
