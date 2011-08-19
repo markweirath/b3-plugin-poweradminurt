@@ -757,8 +757,11 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
       event.type, event.client, event.target, event.data)
 
   def _getScores(self, clients):
-    scores = {}
     xlrstats = self.console.getPlugin('xlrstats')
+    playerstats = {}
+    maxstats = {}
+    minstats = {}
+    keys = 'hsratio', 'killratio', 'teamcontrib', 'xhsratio', 'xkillratio'
     for c in clients:
       if not c.isvar(self, 'teamtime'):
           c.setvar(self, 'teamtime', self.console.time())
@@ -767,19 +770,57 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
       deaths = max(0, c.var(self, 'deaths', 0).value)
       teamkills = max(0, c.var(self, 'teamkills', 0).value)
       hs = c.var(self, 'headhits', 0).value + c.var(self, 'helmethits', 0).value
-      T = min(1.0, age/5.0) # reduce score for players who just joined
-      hsratio = T*min(1.0, hs/(1.0+kills)) # hs can be greater than kills
-      score = T*kills/(1.0+deaths+teamkills) + T*(kills-deaths-teamkills)/(age+1.0)
+      hsratio = min(1.0, hs/(1.0+kills)) # hs can be greater than kills
+      killratio = kills/(1.0+deaths+teamkills) 
+      teamcontrib = (kills-deaths-teamkills)/(age+1.0)
+      playerstats[c.id] = {
+        'age' : age,
+        'hsratio' : hsratio,
+        'killratio' : killratio,
+        'teamcontrib' : teamcontrib,
+      }
       stats = xlrstats and xlrstats.get_PlayerStats(c)
       if stats:
+        playerstats[c.id]['xkillratio'] = stats.ratio
         head = xlrstats.get_PlayerBody(playerid=c.cid, bodypartid=0).kills
         helmet = xlrstats.get_PlayerBody(playerid=c.cid, bodypartid=1).kills
         xhsratio = min(1.0, (head + helmet)/(1.0+kills))
-        score += 0.5*hsratio + 0.5*xhsratio + stats.ratio
-        self.debug('score: %s %s score=%.2f age=%.2f kills=%s deaths=%s hs=%s hsr=%.2f xhsr=%.2f' % (c.team, c.name, score, age, kills, deaths, hs, hsratio, xhsratio))
+        playerstats[c.id]['xhsratio'] = xhsratio
       else:
-        score += hsratio + 0.8
-        self.debug('score: %s %s score=%.2f age=%.2f kills=%s deaths=%s hs=%s hsratio=%.2f' % (c.team, c.name, score, age, kills, deaths, hs, hsratio))
+        playerstats[c.id]['xhsratio'] = 0.0
+        playerstats[c.id]['xkillratio'] = 0.8
+      for key in keys:
+        if key not in maxstats or maxstats[key] < playerstats[c.id][key]:
+          maxstats[key] = playerstats[c.id][key]
+        if key not in minstats or minstats[key] > playerstats[c.id][key]:
+          minstats[key] = playerstats[c.id][key]
+    scores = {}
+    weights = {
+      'killratio' : 1.0,
+      'teamcontrib' : 0.5,
+      'hsratio' : 0.3,
+      'xkillratio' : 1.0,
+      'xhsratio' : 0.5,
+    }
+    weightsum = sum(weights[key] for key in keys)
+    self.debug("score: maxstats=%s" % maxstats)
+    self.debug("score: minstats=%s" % minstats)
+    for c in clients:
+      score = 0.0
+      T = min(1.0, playerstats[c.id]['age']/5.0) # reduce score for players who just joined
+      msg = []
+      for key in keys:
+        denom = maxstats[key]-minstats[key]
+        if not denom:
+          continue
+        msg.append("%s=%.3f" % (key, playerstats[c.id][key]))
+        keyscore = weights[key]*(playerstats[c.id][key]-minstats[key])/denom
+        if key in ('killratio', 'teamcontrib', 'hsratio'):
+          score += T*keyscore
+        else:
+          score += keyscore
+      score /= weightsum
+      self.debug('score: %s %s score=%.3f %s' % (c.team, c.name, score, ' '.join(msg)))
       scores[c.id] = score
     return scores
 
@@ -846,7 +887,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     Skill shuffle. Shuffle players to balanced teams by numbers and skill.
     Locked players are also moved.
     """
-    olddiff, bestdiff, blue, red = self._randTeams(100, 1.0)
+    olddiff, bestdiff, blue, red = self._randTeams(100, 0.1)
     if (client.team == b3.TEAM_BLUE and \
         client.cid not in [ c.cid for c in blue ]) or \
        (client.team == b3.TEAM_RED and \
@@ -938,12 +979,10 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     Move as few players as needed to create teams balanced by numbers AND skill.
     Locked players are not moved.
     """
-    if self.ignoreCheck():
-      return
     # always allow at least 2 moves, but don't move more than 30% of the
     # players
     olddiff, bestdiff, bestblue, bestred = \
-      self._randTeams(100, 1.0, 0.3)
+      self._randTeams(100, 0.1, 0.3)
     if bestdiff is not None:
       self.console.write('bigtext Minmoving!')
       self._move(bestblue, bestred)
@@ -969,7 +1008,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     bestblue = bestred = None # best teams so far when diff > slack
     sbestblue = sbestred = None # new teams so far when diff < slack
     epsilon = 0.0001
-    if abs(len(oldblue)-len(oldred)) > 1:
+    if not maxmovesperc and abs(len(oldblue)-len(oldred)) > 1:
       # Teams are unbalanced by count, force both teams two have equal number
       # of players
       self.debug('rand: force new teams')
@@ -2459,7 +2498,7 @@ if __name__ == '__main__':
                     return None
         def writercon(self, msg, maxRetries=None):
             """Write a message to Rcon/Console"""
-            outputrcon = b3.parsers.q3a_rcon.Rcon(self, (\
+            outputrcon = b3.parsers.q3a.rcon.Rcon(self, (\
                                  self.config.get('server', 'rcon_ip'), \
                                  self.config.getint('server', 'port')), \
                                  self.config.get('server', 'rcon_password'))
@@ -2472,7 +2511,7 @@ if __name__ == '__main__':
     fakeConsole = FakeUrtConsole(b3xml)
     fakeConsole.startup()
     
-    p = PoweradminurtPlugin(fakeConsole, config=os.path.dirname(__file__)+'/conf/poweradminurt.xml')
+    p = PoweradminurtPlugin(fakeConsole, config=os.path.dirname(os.path.abspath(__file__))+'/conf/poweradminurt.xml')
     p.onStartup()
     
     ########################## ok lets test ###########################
@@ -2482,6 +2521,6 @@ if __name__ == '__main__':
     
     superadmin.says('!slap joe')
     superadmin.says('!slap joe 5')
-    
+
     time.sleep(30)
 
