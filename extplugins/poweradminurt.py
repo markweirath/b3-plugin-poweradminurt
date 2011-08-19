@@ -770,7 +770,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
       T = min(1.0, age/5.0) # reduce score for players who just joined
       hsratio = T*min(1.0, hs/(1.0+kills)) # hs can be greater than kills
       score = T*kills/(1.0+deaths+teamkills) + T*(kills-deaths-teamkills)/(age+1.0)
-      stats = xlrstats.get_PlayerStats(c)
+      stats = xlrstats and xlrstats.get_PlayerStats(c)
       if stats:
         head = xlrstats.get_PlayerBody(playerid=c.cid, bodypartid=0).kills
         helmet = xlrstats.get_PlayerBody(playerid=c.cid, bodypartid=1).kills
@@ -1009,7 +1009,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
         i += 1
     return i
 
-  def cmd_bbswap(self, data, client, cmd=None):
+  def cmd_paswap(self, data, client, cmd=None):
     """\
     <player1> [player2] - Swap two teams for 2 clients. If player2 is not specified, the admin
     using the command is swapped with player1. Doesn't work with spectators (exception for calling admin).
@@ -1043,15 +1043,9 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
       client.message("%s and %s are on the same team! - Nice Try :p" % ((client1.name), client2.name))
       return False
     if client1.team == b3.TEAM_RED:
-      team1 = "blue"
-      team2 = "red"
+      self._move([client1], [client2])  
     else:
-      team1 = "red"
-      team2 = "blue"
-    self.console.write("forceteam %s spectator" % (client1.name))
-    self.console.write("forceteam %s spectator" % (client2.name))	
-    self.console.write("forceteam %s %s" % ((client1.name), team1))
-    self.console.write("forceteam %s %s" % ((client2.name), team2))	
+      self._move([client2], [client1])  
     # No need to send the message twice to the switching admin :-)
     if (client1 != client):
       client1.message("^4You were swapped with %s by the admin." % (client2.name))

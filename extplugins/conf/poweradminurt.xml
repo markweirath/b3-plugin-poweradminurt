@@ -23,6 +23,7 @@
 		<set name="paunskuffle-unsk">60</set>
 		<set name="pabalance-bal">20</set>
 		<set name="paminmoves-min">2</set>
+		<set name="paswap-swap">20</set>
 
 		<set name="pamoon-moon">20</set>
 
