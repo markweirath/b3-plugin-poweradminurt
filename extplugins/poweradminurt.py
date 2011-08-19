@@ -866,8 +866,15 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
   def _countSnipers(self, team):
     n = 0
     for c in team:
-      # Count players with SR8
-      if 'Z' in getattr(c, 'gear', ''):
+      kills = max(0, c.var(self, 'kills', 0).value)
+      deaths = max(0, c.var(self, 'deaths', 0).value)
+      ratio = kills/(1.0+deaths)
+      if ratio < 1.2:
+        # Ignore sniper noobs
+        continue 
+      # Count players with SR8 and PSG1
+      gear = getattr(c, 'gear', '')
+      if 'Z' in gear or 'N' in gear:
         n += 1
     return n
 
