@@ -969,6 +969,12 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     bestblue = bestred = None # best teams so far when diff > slack
     sbestblue = sbestred = None # new teams so far when diff < slack
     epsilon = 0.0001
+    if abs(len(oldblue)-len(oldred)) > 1:
+      # Teams are unbalanced by count, force both teams two have equal number
+      # of players
+      self.debug('rand: force new teams')
+      blue, red = self._getRandomTeams(clients, checkforced=True)
+      bestdiff = self._getTeamScoreDiff(blue, red, scores)
     for _ in xrange(times):
       blue, red = self._getRandomTeams(clients, checkforced=True)
       m = self._countMoves(oldblue, blue) + self._countMoves(oldred, red)
