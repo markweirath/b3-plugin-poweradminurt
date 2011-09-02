@@ -23,12 +23,12 @@
 		<set name="paunskuffle-unsk">60</set>
 		<set name="pabalance-bal">20</set>
 		<set name="paminmoves-min">2</set>
+		<set name="paautoskuffle-ask">60</set>
 		<set name="paswap-swap">20</set>
 
 		<set name="pamoon-moon">20</set>
 
 		<set name="papublic-public">60</set>
-
 
 		<set name="pamatch-match">60</set>
 		<set name="pagear-gear">60</set>
@@ -92,6 +92,16 @@
 		<set name="autobalance_gametypes">tdm</set>
 		<!-- If a player is locked using !paforceteam, should it be permanent? False releases all locks on gameExit -->
 		<set name="teamLocksPermanent">False</set>
+	</settings>
+
+	<settings name="skillbalancer">
+		<!-- tinterval sets checking intervals in minutes, 0 disables function -->
+		<set name="interval">1</set>
+		<!-- how much difference should we tolerate, unit is average team
+         contribution (kills-deaths) per interval for the top players -->
+		<set name="tcdifference">3</set>
+		<!-- mode: 0 = none, 1 = suggest, 2 = auto minmoves, 3 = auto skuffle -->
+		<set name="mode">1</set>
 	</settings>
 
 	<settings name="votedelay">

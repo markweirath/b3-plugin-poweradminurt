@@ -131,9 +131,11 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
   _ncronTab = None
   _tcronTab = None
   _scronTab = None
+  _skcronTab = None
   _ninterval = 0
   _tinterval = 0
   _sinterval = 0
+  _skinterval = 0
   _teamred = 0
   _teamblue = 0
   _teamdiff = 0
@@ -250,6 +252,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     self.LoadTeamBalancer()
     self.LoadVoteDelayer()
     self.LoadSpecChecker()
+    self.LoadSkillBalancer()
     self.LoadMoonMode()
     self.LoadPublicMode()
     self.LoadMatchMode()
@@ -364,7 +367,34 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
       self._teamLocksPermanent = False
       self.debug('Using default value (%s) for teamLocksPermanent', self._teamLocksPermanent)
 
+  def LoadSkillBalancer(self):
+    # SKILLBALANCER SETUP
+    try:
+      self._skinterval = self.config.getint('skillbalancer', 'interval')
+    except:
+      self._skinterval = 0
+      self.debug('Using default value (%s) for Skillbalancer Interval', self._skinterval)
     
+    # set a max interval for skillchecker
+    if self._skinterval > 59:
+      self._skinterval = 59
+    
+    try:
+      self._skilldiff = self.config.getint('skillbalancer', 'tcdifference')
+    except:
+      self._skilldiff = 3
+      self.debug('Using default value (%s) for skilldiff', self._skilldiff)
+    # set a minimum/maximum teamdifference
+    if self._skilldiff < 1:
+      self._skilldiff = 1
+    if self._skilldiff > 9:
+      self._skilldiff = 9
+    
+    try:
+      self._skill_balance_mode = self.config.getint('skillbalancer', 'mode')
+    except:
+      self._skill_balance_mode = 0
+      self.debug('Using default value (%s) for skill_balance_mode', self._skill_balance_mode)
 
   def LoadVoteDelayer(self):
     #VOTEDELAYER SETUP
@@ -653,6 +683,9 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     if self._scronTab:
       # remove existing crontab
       self.console.cron - self._scronTab
+    if self._skcronTab:
+      # remove existing crontab
+      self.console.cron - self._skcronTab
     if self._ninterval > 0:
       self._ncronTab = b3.cron.PluginCronTab(self, self.namecheck, 0, '*/%s' % (self._ninterval))
       self.console.cron + self._ncronTab
@@ -662,7 +695,9 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     if self._sinterval > 0:
       self._scronTab = b3.cron.PluginCronTab(self, self.speccheck, 0, '*/%s' % (self._sinterval))
       self.console.cron + self._scronTab
-
+    if self._skinterval > 0:
+      self._skcronTab = b3.cron.PluginCronTab(self, self.skillcheck, 0, '*/%s' % (self._skinterval))
+      self.console.cron + self._skcronTab
 
   def getCmd(self, cmd):
     cmd = 'cmd_%s' % cmd
@@ -714,6 +749,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
         self.debug('Starting RecountPlayers Timer: %s seconds' % (time))
         t2.start()
     elif event.type == b3.events.EVT_GAME_ROUND_START:
+      self._forgetTeamContrib()
       # check for botsupport
       if self._botenable:
         self.botsdisable()
@@ -748,6 +784,9 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
   def onKill(self, killer, victim, points):
     killer.var(self, 'kills', 0).value  += 1
     victim.var(self, 'deaths', 0).value += 1
+    now = time.time()
+    killer.var(self, 'teamcontribhist', []).value.append((now, 1))
+    victim.var(self, 'teamcontribhist', []).value.append((now, -1))
     
   def onTeamKill(self, killer, victim, points):
     killer.var(self, 'teamkills', 0).value += 1
@@ -863,13 +902,47 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     red = [ c for c in clients if c.team == b3.TEAM_RED ]
     diff = self._getTeamScoreDiff(blue, red, scores)
     team = diff < 0 and 'red' or 'blue'
-    self.console.write('^4Team skill difference is ^1%.2f (%s is stronger)' % (
+    bs, rs = self._getRecentTeamContrib(blue, red)
+    tcdiff = abs(bs-rs)
+    # Difference in Average Team Contribution Per Minute
+    self.console.write('DATCPM is %.2f' % tcdiff)
+    self.console.write('^4Skill diff is ^1%.2f, %s is stronger' % (
       diff, team))
       
+  def _getRecentTeamContrib(self, blue, red):
+    if not blue or not red:
+      return 0.0, 0.0
+    recentcontrib = {}
+    T = 2.0 # minutes
+    t0 = time.time() - T*60
+    for c in blue + red:
+        hist = c.var(self, 'teamcontribhist', []).value
+        contrib = 0
+        for t, s in hist:
+          if t0 < t:
+            contrib += s
+        recentcontrib[c.id] = contrib
+    self.debug('recent: %s' % recentcontrib)
+    def contribcmp(a, b):
+       return cmp(recentcontrib[b.id], recentcontrib[a.id])
+    blue = sorted(blue, cmp=contribcmp)
+    red = sorted(red, cmp=contribcmp)
+    n = max(1, min(len(blue)/2, len(red)/2))
+    bs = float(sum(recentcontrib[c.id] for c in blue[:n]))/n/T
+    rs = float(sum(recentcontrib[c.id] for c in red[:n]))/n/T
+    self.debug('recent: n=%d %.2f %.2f' % (n, bs, rs))
+    return bs, rs
+
+  def _forgetTeamContrib(self):
+    clients = self.console.clients.getList()
+    for c in clients:
+      c.setvar(self, 'teamcontribhist', [])
+
   def cmd_paunskuffle(self, data, client, cmd=None):
     """\
     Create unbalanced teams. Used to test !paskuffle and !paminmoves.
     """
+    self._balancing = True
     clients = self.console.clients.getList()
     scores = self._getScores(clients)
     decorated = [ (scores.get(c.id, 0), c) for c in clients 
@@ -881,19 +954,23 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     red = players[n:]
     self.console.write('bigtext "Unskuffling! Noobs beware!"')
     self._move(blue, red)
+    self._forgetTeamContrib()
+    self._balancing = False
 
-  def cmd_paskuffle(self, data, client, cmd=None):
+  def cmd_paskuffle(self, data=None, client=None, cmd=None):
     """\
     Skill shuffle. Shuffle players to balanced teams by numbers and skill.
     Locked players are also moved.
     """
+    self._balancing = True
     olddiff, bestdiff, blue, red = self._randTeams(100, 0.1)
-    if (client.team == b3.TEAM_BLUE and \
-        client.cid not in [ c.cid for c in blue ]) or \
-       (client.team == b3.TEAM_RED and \
-        client.cid not in [ c.cid for c in red ]):
-       # don't move player who initiated skuffle
-       blue, red = red, blue
+    if client:
+      if (client.team == b3.TEAM_BLUE and \
+          client.cid not in [ c.cid for c in blue ]) or \
+         (client.team == b3.TEAM_RED and \
+          client.cid not in [ c.cid for c in red ]):
+         # don't move player who initiated skuffle
+         blue, red = red, blue
     moves = 0
     if bestdiff is not None:
         self.console.write('bigtext "Skill Shuffle in Progress!"')
@@ -903,6 +980,8 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
           olddiff, bestdiff))
     else:
         self.console.write('^1Cannot improve team balance!')
+    self._forgetTeamContrib()
+    self._balancing = False
   
   def _countSnipers(self, team):
     n = 0
@@ -974,11 +1053,12 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
 
     return moves
 
-  def cmd_paminmoves(self, data, client, cmd=None):
+  def cmd_paminmoves(self, data=None, client=None, cmd=None):
     """\
     Move as few players as needed to create teams balanced by numbers AND skill.
     Locked players are not moved.
     """
+    self._balancing = True
     # always allow at least 2 moves, but don't move more than 30% of the
     # players
     olddiff, bestdiff, bestblue, bestred = \
@@ -991,6 +1071,8 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     else:
       # we couldn't beat the previous diff by moving only a few players, do a full skuffle
       self.cmd_paskuffle(data, client, cmd)
+    self._forgetTeamContrib()
+    self._balancing = False
 
   def _randTeams(self, times, slack, maxmovesperc=None):
     # randomize teams a few times and pick the most balanced
@@ -1012,8 +1094,8 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
       # Teams are unbalanced by count, force both teams two have equal number
       # of players
       self.debug('rand: force new teams')
-      blue, red = self._getRandomTeams(clients, checkforced=True)
-      bestdiff = self._getTeamScoreDiff(blue, red, scores)
+      bestblue, bestred = self._getRandomTeams(clients, checkforced=True)
+      bestdiff = self._getTeamScoreDiff(bestblue, bestred, scores)
     for _ in xrange(times):
       blue, red = self._getRandomTeams(clients, checkforced=True)
       m = self._countMoves(oldblue, blue) + self._countMoves(oldred, red)
@@ -1061,6 +1143,91 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
         i += 1
     return i
 
+  def skillcheck(self):
+    if self._balancing or self.ignoreCheck():
+      return
+
+    gametype = self._getGameType()
+
+    if gametype != "tdm":
+        return
+
+    if self._skill_balance_mode == 0:
+        # disabled
+        return
+    
+    clients = self.console.clients.getList()
+    blue = [ c for c in clients if c.team == b3.TEAM_BLUE ]
+    red = [ c for c in clients if c.team == b3.TEAM_RED ]
+
+    if len(blue) + len(red) <= 2:
+      self.debug('skillcheck: too few players')
+      return
+
+    bs, rs = self._getRecentTeamContrib(blue, red)
+    team = bs < rs and 'Red' or 'Blue'
+    diff = abs(bs-rs)
+    unbalanced = False
+    self.debug('skillcheck: blue=%.2f red=%.2f diff=%.2f' % (bs, rs, diff))
+
+    if diff >= self._skilldiff:
+      unbalanced = True
+
+    if unbalanced or self._skill_balance_mode == 1:
+      word = None
+      if 1 <= diff < 2:
+        word = 'stronger'
+      if 2 <= diff < 3:
+        word = 'dominating'
+      if 3 <= diff < 4:
+        word = 'overpowering'
+      if 4 <= diff < 5:
+        word = 'supreme'
+      if 5 <= diff < 6:
+        word = 'Godlike!'
+      if 6 <= diff:
+        word = 'probably cheating :P'
+      if word:
+        # Difference in Average Team Contribution Per Minute
+        self.console.write('DATCPM is %.2f' % diff)
+        if self._skill_balance_mode == 1 and diff > 2.31: # constant carefully reviewed by an eminent team of trained Swedish scientistians :)
+          msg = '%s team is %s, consider shuffling' % (team, word)
+          self.console.write(msg)
+          self.console.write('bigtext "%s"' % msg)
+        else:
+          msg = '%s team is %s' % (team, word)
+          self.console.write(msg)
+          self.console.write('bigtext "%s"' % msg)
+
+    if unbalanced:
+      if self._skill_balance_mode == 2:
+        self.cmd_paminmoves()
+      if self._skill_balance_mode == 3:
+        self.cmd_paskuffle()
+
+    return None
+
+  def cmd_paautoskuffle(self, data, client, cmd=None):
+    modes = ["0-none", "1-suggest", "2-autominmoves", "3-autoskuffle"]
+    if not data:
+      mode = modes[self._skill_balance_mode]
+      self.console.write("Skill balancer mode is '%s'" % mode)
+      self.console.write("Options are %s" % ', '.join(modes))
+      return
+    mode = None
+    try:
+      mode = int(data)
+    except ValueError:
+      for i, m in enumerate(modes):
+        if data in m:
+          mode = i
+    if mode is not None and 0 <= mode <= 3:
+      self._skill_balance_mode = mode
+      self.console.write("Skill balancer mode is now '%s'" % modes[mode])
+      self.skillcheck()
+    else:
+      self.console.write("Valid options are %s" % ', '.join(modes))
+
   def cmd_paswap(self, data, client, cmd=None):
     """\
     <player1> [player2] - Swap two teams for 2 clients. If player2 is not specified, the admin
@@ -1086,13 +1253,13 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     else:
       client2 = client
     if client1.team == b3.TEAM_SPEC:
-      client.message("%s is a spectator! - Can't be Swaped" % (client1.name))
+      client.message("%s is a spectator! - Can't be swapped" % (client1.name))
       return False
     if client2.team == b3.TEAM_SPEC:
-      client.message("%s is a spectator! - Can't be Swaped" % (client2.name))
+      client.message("%s is a spectator! - Can't be swapped" % (client2.name))
       return False
     if client1.team == client2.team:
-      client.message("%s and %s are on the same team! - Nice Try :p" % ((client1.name), client2.name))
+      client.message("%s and %s are on the same team! - Swapped them anyway :p" % ((client1.name), client2.name))
       return False
     if client1.team == b3.TEAM_RED:
       self._move([client1], [client2])  
@@ -1829,9 +1996,9 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     except:
       return False
 
-  def teamcheck(self):
+  def _getGameType(self):
     # g_gametype //0=FreeForAll=dm, 3=TeamDeathMatch=tdm, 4=Team Survivor=ts, 
-	# 5=Follow the Leader=ftl, 6=Capture and Hold=cah, 7=Capture The Flag=ctf, 8=Bombmode=bm
+    # 5=Follow the Leader=ftl, 6=Capture and Hold=cah, 7=Capture The Flag=ctf, 8=Bombmode=bm
 
     # 10/22/2008 - 1.4.0b10 - mindriot
     # if gametype is unknown when B3 is started in the middle of a game
@@ -1843,9 +2010,14 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
       except:
         self.debug('Unable to determine current gametype - remains at (%s)', self.console.game.gameType)
 
+    return self.console.game.gameType
+
+  def teamcheck(self):
+    gametype = self._getGameType()
+
     # run teambalance only if current gametype is in autobalance_gametypes list
     try:
-      self._autobalance_gametypes_array.index(self.console.game.gameType)
+      self._autobalance_gametypes_array.index(gametype)
     except:
       self.debug('Current gametype (%s) is not specified in autobalance_gametypes - teambalancer disabled', self.console.game.gameType)
       return None 
