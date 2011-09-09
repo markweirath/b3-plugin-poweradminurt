@@ -21,8 +21,8 @@
         <set name="pateams-teams">2</set>
         <set name="paskuffle-sk">20</set>
         <set name="paunskuffle-unsk">60</set>
-        <set name="pabalance-bal">20</set>
-        <set name="paminmoves-min">2</set>
+        <set name="paadvise-adv">2</set>
+        <set name="pabalance-bal">2</set>
         <set name="paautoskuffle-ask">60</set>
         <set name="paswap-swap">20</set>
 
@@ -101,8 +101,8 @@
         <!-- how much difference should we tolerate, unit is average team
         contribution (kills-deaths) per interval for the top players -->
         <set name="tcdifference">3</set>
-        <!-- mode: 0 = none, 1 = suggest, 2 = auto minmoves, 3 = auto skuffle -->
-        <set name="mode">1</set>
+        <!-- mode: 0 = none, 1 = advise, 2 = autobalance, 3 = autoskuffle -->
+        <set name="mode">0</set>
     </settings>
 
     <settings name="votedelay">

@@ -916,22 +916,23 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     redscore = self._getTeamScore(red, scores)
     return bluescore-redscore
     
-  def cmd_pabalance(self, data, client, cmd=None):
+  def cmd_paadvise(self, data, client, cmd=None):
     """\
-    Report team skill balance.
+    Report team skill balance, and give advice if teams are unfair
     """
     clients = self.console.clients.getList()
     scores = self._getScores(clients)
     blue = [ c for c in clients if c.team == b3.TEAM_BLUE ]
     red = [ c for c in clients if c.team == b3.TEAM_RED ]
+    self.debug("advise: numblue=%d numred=%d" % (len(blue), len(red)))
     diff = self._getTeamScoreDiff(blue, red, scores)
-    team = diff < 0 and 'red' or 'blue'
     bs, rs = self._getRecentTeamContrib(blue, red)
-    tcdiff = abs(bs-rs)
+    tcdiff = bs-rs
+    self.debug('advise: blue=%.2f red=%.2f tcdiff=%.2f' % (bs, rs, tcdiff))
     # Difference in Average Team Contribution Per Minute
-    self.console.write('DATCPM is %.2f' % tcdiff)
-    self.console.write('^4Skill diff is ^1%.2f, %s is stronger' % (
-      diff, team))
+    self.console.write('DATCPM is %.2f, skill diff is %.2f' % \
+      (tcdiff, diff))
+    self._advise(tcdiff, 1, 1, 0)
       
   def _getRecentTeamContrib(self, blue, red):
     if not blue or not red:
@@ -964,7 +965,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
 
   def cmd_paunskuffle(self, data, client, cmd=None):
     """\
-    Create unbalanced teams. Used to test !paskuffle and !paminmoves.
+    Create unbalanced teams. Used to test !paskuffle and !pabalance.
     """
     self._balancing = True
     clients = self.console.clients.getList()
@@ -1077,18 +1078,21 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
 
     return moves
 
-  def cmd_paminmoves(self, data=None, client=None, cmd=None):
+  def cmd_pabalance(self, data=None, client=None, cmd=None):
     """\
     Move as few players as needed to create teams balanced by numbers AND skill.
     Locked players are not moved.
     """
+    if client.maxLevel < 20 and self.ignoreCheck():
+      client.message('Teams changed recently, please wait a while')
+      return None
     self._balancing = True
     # always allow at least 2 moves, but don't move more than 30% of the
     # players
     olddiff, bestdiff, bestblue, bestred = \
       self._randTeams(100, 0.1, 0.3)
     if bestdiff is not None:
-      self.console.write('bigtext Minmoving!')
+      self.console.write('bigtext "Balancing teams!"')
       self._move(bestblue, bestred)
       self.console.write('^4Team skill difference was ^1%.2f^4, is now ^1%.2f' % (
         olddiff, bestdiff))
@@ -1183,56 +1187,75 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     clients = self.console.clients.getList()
     blue = [ c for c in clients if c.team == b3.TEAM_BLUE ]
     red = [ c for c in clients if c.team == b3.TEAM_RED ]
+    self.debug("skillcheck: numblue=%d numred=%d" % (len(blue), len(red)))
 
     if len(blue) + len(red) <= 2:
       self.debug('skillcheck: too few players')
       return
 
     bs, rs = self._getRecentTeamContrib(blue, red)
-    team = bs < rs and 'Red' or 'Blue'
-    diff = abs(bs-rs)
+    tcdiff = bs-rs
+    absdiff = abs(tcdiff)
     unbalanced = False
-    self.debug('skillcheck: blue=%.2f red=%.2f diff=%.2f' % (bs, rs, diff))
+    self.debug('skillcheck: blue=%.2f red=%.2f tcdiff=%.2f' % (bs, rs, tcdiff))
 
-    if diff >= self._skilldiff:
+    if absdiff >= self._skilldiff:
       unbalanced = True
 
     if unbalanced or self._skill_balance_mode == 1:
-      word = None
-      if 1 <= diff < 2:
-        word = 'stronger'
-      if 2 <= diff < 3:
-        word = 'dominating'
-      if 3 <= diff < 4:
-        word = 'overpowering'
-      if 4 <= diff < 5:
-        word = 'supreme'
-      if 5 <= diff < 6:
-        word = 'Godlike!'
-      if 6 <= diff:
-        word = 'probably cheating :P'
-      if word:
-        # Difference in Average Team Contribution Per Minute
-        self.console.write('DATCPM is %.2f' % diff)
-        if self._skill_balance_mode == 1 and diff > 2.31: # constant carefully reviewed by an eminent team of trained Swedish scientistians :)
-          msg = '%s team is %s, consider shuffling' % (team, word)
-          self.console.write(msg)
-          self.console.write('bigtext "%s"' % msg)
-        else:
-          msg = '%s team is %s' % (team, word)
-          self.console.write(msg)
-          self.console.write('bigtext "%s"' % msg)
+        if absdiff > 1:
+          # Difference in Average Team Contribution Per Minute
+          self.console.write('DATCPM is %.2f' % tcdiff)
+          if self._skill_balance_mode == 1:
+            # Give advice if teams are unfair
+            self._advise(tcdiff, 2, 1, 1)
+          else:
+            # Only report stronger team, we will balance/skuffle below
+            self._advise(tcdiff, 0, 1, 1)
 
     if unbalanced:
       if self._skill_balance_mode == 2:
-        self.cmd_paminmoves()
+        self.cmd_pabalance()
       if self._skill_balance_mode == 3:
         self.cmd_paskuffle()
 
     return None
+  
+  def _advise(self, tcdiff, mode, console, bigtext):
+    # mode 0: no advice
+    # mode 1: give advice
+    # mode 2: give advice if teams are unfair
+    absdiff = abs(tcdiff)
+    unfair = absdiff > 2.31 # constant carefully reviewed by an eminent team of trained Swedish scientistians :)
+    word = None
+    if 1 <= absdiff < 2:
+      word = 'stronger'
+    if 2 <= absdiff < 3:
+      word = 'dominating'
+    if 3 <= absdiff < 4:
+      word = 'overpowering'
+    if 4 <= absdiff < 5:
+      word = 'supreme'
+    if 5 <= absdiff < 6:
+      word = 'Godlike!'
+    if 6 <= absdiff:
+      word = 'probably cheating :P'
+    if word:
+      team = tcdiff < 0 and 'Red' or 'Blue'
+      msg = '%s team is %s' % (team, word)
+      if unfair and (mode == 1 or mode == 2):
+          msg = '%s team is %s, consider to use !bal' % (team, word)
+      if not unfair and mode == 1:
+          msg = '%s team is %s, but no action necessary yet' % (team, word)
+    else:
+       msg = 'Teams seem fair'
+    if console:
+      self.console.write(msg)
+    if bigtext:
+      self.console.write('bigtext "%s"' % msg)
 
   def cmd_paautoskuffle(self, data, client, cmd=None):
-    modes = ["0-none", "1-suggest", "2-autominmoves", "3-autoskuffle"]
+    modes = ["0-none", "1-advise", "2-autobalance", "3-autoskuffle"]
     if not data:
       mode = modes[self._skill_balance_mode]
       self.console.write("Skill balancer mode is '%s'" % mode)
@@ -2067,6 +2090,9 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
       self.debug('Current gametype (%s) is not specified in autobalance_gametypes - teambalancer disabled', self.console.game.gameType)
       return None 
 
+    if gametype == "tdm" and self._skill_balance_mode != 0:
+      self.debug('Skill balancer is active, not performing classic teamcheck');
+        
     if self.console.time() > self._ignoreTill:
       self.teambalance()
 
