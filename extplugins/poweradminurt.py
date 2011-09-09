@@ -74,6 +74,9 @@
 # * Added TeamLock release command '!paforce all free' and release on gameExit
 # 09/07/2009 - 1.4.3 by SGT
 # add use of dictionary for private password (papublic)
+# 09/21/2009 - 1.4.3 - SGT
+# new commands: !pasetwave, !pasetgravity
+# add individual config modes for game types and match mode
 # 27/10/2009 - 1.5.0 - Courgette
 # /!\ REQUIRES B3 v1.2.1 /!\
 # * add !pamap which works with partial map names
@@ -183,6 +186,9 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
   _autobalance_gametypes = 'tdm'
   _autobalance_gametypes_array = []
   _max_dic_size = 512000 #max dictionary size in bytes
+  _slapSafeLevel = None
+  _ignorePlus = 30
+  _full_ident_level = 20
 
   def startup(self):
     """\
@@ -212,6 +218,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
 
     # Register our events
     self.verbose('Registering events')
+    self.createEvent('EVT_CLIENT_PUBLIC', 'Server Public Mode Changed')
     self.registerEvent(b3.events.EVT_GAME_ROUND_START)
     self.registerEvent(b3.events.EVT_GAME_EXIT)
     #self.registerEvent(b3.events.EVT_CLIENT_JOIN)
@@ -224,11 +231,15 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     self.registerEvent(b3.events.EVT_CLIENT_KILL_TEAM)
 
     # don't run cron-checks on startup
-    self.ignoreSet(60)
+    self.ignoreSet(self._ignorePlus)
     self._balancing = False
     
     # save original vote settings
-    self._origvote = self.console.getCvar('g_allowvote').getInt()
+    try:
+        self._origvote = self.console.getCvar('g_allowvote').getInt()
+    except:
+        self._origvote = 0 # no votes
+
     # if by any chance on botstart g_allowvote is 0, we'll use the default UrT value
     if self._origvote == 0:
       self._origvote = 536871039
@@ -237,7 +248,9 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     # how many players are allowed and if g_maxGameClients != 0 we will disable specchecking
     self._sv_maxclients = self.console.getCvar('sv_maxclients').getInt()
     self._g_maxGameClients = self.console.getCvar('g_maxGameClients').getInt()
+    self._slapSafeLevel = self.config.getint('special', 'slap_safe_level')
 
+    self._full_ident_level = self.config.getint('special', 'paident_full_level')
     # save original gear settings
     try:
       self._origgear = self.console.getCvar('g_gear').getInt()
@@ -366,6 +379,11 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     except:
       self._teamLocksPermanent = False
       self.debug('Using default value (%s) for teamLocksPermanent', self._teamLocksPermanent)
+
+    try:
+      self._ignorePlus = self.config.getint('teambalancer','timedelay')
+    except:
+      self.debug('Using default value (%s) for timedelay', self._ignorePlus)     
 
   def LoadSkillBalancer(self):
     # SKILLBALANCER SETUP
@@ -510,6 +528,12 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
         self.match_plugin_disable.append(e.text)
     except:
       self.debug('Can\'t setup pamatch disable plugins because there is no plugins set in config')
+    self.gameconfig = {}
+    try:
+      for e in self.config.get('gameconfig/config'):
+        self.gameconfig[e.attrib['name']]=e.text
+    except:
+      self.warning('Can\'t read gameconfig')
 
   def LoadBotSupport(self):
     # BOT SUPPORT SETUP
@@ -690,7 +714,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
       self._ncronTab = b3.cron.PluginCronTab(self, self.namecheck, 0, '*/%s' % (self._ninterval))
       self.console.cron + self._ncronTab
     if self._tinterval > 0:
-      self._tcronTab = b3.cron.PluginCronTab(self, self.teamcheck, 0, '*/%s' % (self._tinterval))
+      self._tcronTab = b3.cron.PluginCronTab(self, self.teamcheck, '*/%s' % (self._tinterval))
       self.console.cron + self._tcronTab
     if self._sinterval > 0:
       self._scronTab = b3.cron.PluginCronTab(self, self.speccheck, 0, '*/%s' % (self._sinterval))
@@ -732,7 +756,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
       self._mapchanged = True
       if self._botenable:
         self.botsdisable()
-      self.ignoreSet(60)
+      self.ignoreSet(self._ignorePlus)
       # reset headshotcounter (per map) if applicable
       if self._hsresetvars == 'map':
           self.resetVars()
@@ -758,7 +782,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
       if self._hsresetvars == 'round':
           self.resetVars()
       # ignore teambalance checking for 1 minute
-      self.ignoreSet(60)
+      self.ignoreSet(self._ignorePlus)
       self._teamred = 0
       self._teamblue = 0
       # vote delay init
@@ -1365,9 +1389,10 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
 
   def cmd_pacyclemap(self, data, client, cmd=None):
     """\
-    Cycle to the next map.
-    (You can safely use the command without the 'pa' at the beginning)
-    """
+        Cycle to the next map.
+        (You can safely use the command without the 'pa' at the beginning)
+        """
+    time.sleep(1)
     self.console.write('cyclemap')
     return True
 
@@ -1452,6 +1477,9 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
       client.message('^7Invalid data, try !help pamute')
       return False
 
+    if sclient.maxLevel > client.maxLevel:
+      client.message('^7You don\'t have enought privileges to mute this player')
+      return False
     if input[1] is not None and re.match('^([0-9]+)\s*$', input[1]):
       duration = int(input[1])
     else:
@@ -1487,6 +1515,10 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
         return False
     else:
       client.message('^7Invalid data, try !help paslap')
+      return False
+
+    if sclient.maxLevel >= self._slapSafeLevel and client.maxLevel < 90:
+      client.message('^7You don\'t have enought privileges to slap an Admin')
       return False
 
     if input[1]:
@@ -1632,7 +1664,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
 
     # are we still here? Let's write it to console
     self.console.write('forceteam %s %s' % (sclient.cid, team))
-
+    client.message('^3%s ^7forced to ^3%s' % (sclient.name, teamname))
     return True
 
   def cmd_paswapteams(self, data, client, cmd=None):
@@ -1686,6 +1718,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
       if data == 'on':
         self.console.setCvar( 'g_password', '' )
         self.console.say('^7public mode: ^2ON')
+        self.console.queueEvent(b3.events.Event(b3.events.EVT_CLIENT_PUBLIC, '', client)) 
       elif data == 'off':
         newpassword = self._papublic_password
         if self.pass_lines is not None:
@@ -1706,6 +1739,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
           client.message('^7password is \'^4%s^7\''% (newpassword))
           client.message('^7type ^5!mapreload^7 to apply change')
           self.console.write('bigtext "^7Server going ^3PRIVATE^7 soon !!"')
+          self.console.queueEvent(b3.events.Event(b3.events.EVT_CLIENT_PUBLIC, newpassword, client)) 
     return True
     
   def cmd_pamatch(self, data, client, cmd=None): 
@@ -1735,14 +1769,15 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
         self._matchmode = False
         self.console.setCvar( 'g_matchmode', '0' )
         self.console.say('^7match mode: ^9OFF')
-        client.message('^7type ^5!mapreload^7 to apply change')
+
         for e in self.match_plugin_disable:
           self.debug('enabling plugin %s' %e)
           plugin = self.console.getPlugin(e)
           if plugin:
             plugin.enable()
             client.message('^7plugin %s enabled' % e)
-        
+        client.message('^7type ^5!mapreload^7 to apply change')
+    self.set_configmode(None)
     return True
 
 
@@ -1812,6 +1847,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     self.console.write('g_gametype 0')
     if client:
       client.message('^7game type changed to ^4Free For All')
+    self.set_configmode('ffa')
     return True
     
   def cmd_patdm(self, data, client, cmd=None):
@@ -1822,6 +1858,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     self.console.write('g_gametype 3')
     if client:
       client.message('^7game type changed to ^4Team Death Match')
+    self.set_configmode('tdm')
     return True
     
   def cmd_pats(self, data, client, cmd=None):
@@ -1832,6 +1869,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     self.console.write('g_gametype 4')
     if client:
       client.message('^7game type changed to ^4Team Survivor')
+    self.set_configmode('ts')
     return True
     
   def cmd_paftl(self, data, client, cmd=None):
@@ -1842,6 +1880,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     self.console.write('g_gametype 5')
     if client:
       client.message('^7game type changed to ^4Follow The Leader')
+    self.set_configmode('ftl')
     return True
     
   def cmd_pacah(self, data, client, cmd=None):
@@ -1852,6 +1891,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     self.console.write('g_gametype 6')
     if client:
       client.message('^7game type changed to ^4Capture And Hold')
+    self.set_configmode('cah')
     return True
     
   def cmd_pactf(self, data, client, cmd=None):
@@ -1862,6 +1902,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     self.console.write('g_gametype 7')
     if client:
       client.message('^7game type changed to ^4Capture The Flag')
+    self.set_configmode('ctf')
     return True
     
   def cmd_pabomb(self, data, client, cmd=None):
@@ -1872,6 +1913,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     self.console.write('g_gametype 8')
     if client:
       client.message('^7game type changed to ^4Bomb')
+    self.set_configmode('bomb')
     return True
     
     
@@ -1882,8 +1924,8 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     """
     input = self._adminPlugin.parseUserCmd(data)
     if not input:
-      client.message('^7Invalid data, try !help paident')
-      return False
+      cmd.sayLoudOrPM(client, 'Your id is ^2@%s' % (client.id))
+      return True
     else:
       # input[0] is the player id
       sclient = self._adminPlugin.findClientPrompt(input[0], client)
@@ -1892,7 +1934,10 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
         # we can exit here and the user will retry with a more specific player
         return False
 
-    cmd.sayLoudOrPM(client, '%s ^2%s ^2%s^7 ^4%s' % (self.console.formatTime(time.time()), sclient.exactName, sclient.ip, sclient.guid))
+    if client.maxLevel < self._full_ident_level:
+      cmd.sayLoudOrPM(client, '%s ^4@%s ^2%s' % (self.console.formatTime(time.time()), sclient.id, sclient.exactName))
+    else:
+      cmd.sayLoudOrPM(client, '%s ^4@%s ^2%s ^2%s ^2%s' % (self.console.formatTime(time.time()), sclient.id, sclient.exactName, sclient.ip, self.console.formatTime(sclient.timeAdd)))
     return True
       
 #---Teambalance Mechanism--------------------------------------------------------------------------
@@ -2468,25 +2513,25 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     return True
 
   def cmd_pasetnextmap(self, data, client=None, cmd=None):
-	"""\
-	<mapname> - Set the nextmap (partial map name works)
-	"""
-	if not data:
-	  client.message('^7Invalid or missing data, try !help setnextmap')
-	  return False
-	else:
-		match = self.getMapsSoundingLike(data)
-		if len(match) > 1:
-			client.message('do you mean : %s ?' % string.join(match,', '))
-			return True
-		if len(match) == 1:
-			mapname = match[0]
-			self.console.write('g_nextmap %s' % mapname)
-			if client:
-				client.message('^7nextmap set to %s' % mapname)
-		else:
-			client.message('^7cannot find any map like [^4%s^7].' % data)
-			return False
+    """\
+    <mapname> - Set the nextmap (partial map name works)
+    """
+    if not data:
+      client.message('^7Invalid or missing data, try !help setnextmap')
+      return False
+    else:
+      match = self.getMapsSoundingLike(data)
+      if len(match) > 1:
+        client.message('do you mean : %s ?' % string.join(match,', '))
+        return True
+      if len(match) == 1:
+        mapname = match[0]
+        self.console.write('g_nextmap %s' % mapname)
+    if client:
+      client.message('^7nextmap set to %s' % mapname)
+    else:
+      client.message('^7cannot find any map like [^4%s^7].' % data)
+      return False
 
   def cmd_parespawngod(self, data, client, cmd=None):
    """\
@@ -2500,83 +2545,81 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
    return True
 
   def cmd_parespawndelay(self, data, client, cmd=None):
-   """\
-   <seconds> - Set the respawn delay in seconds.
-   """
-   if not data:
+    """\
+    <seconds> - Set the respawn delay in seconds.
+    """
+    if not data:
       client.message('^7Invalid or missing data, try !help respawndelay')
       return False
-   else:
+    else:
       self.console.write( 'g_respawnDelay "%s"' % data )
-   return True
+    return True
 
   def cmd_pacaplimit(self, data, client, cmd=None):
-   """\
-   <caps> - Set the ammount of flagcaps before map is over.
-   """
-   if not data:
+    """\
+    <caps> - Set the ammount of flagcaps before map is over.
+    """
+    if not data:
       client.message('^7Invalid or missing data, try !help caplimit')
       return False
-   else:
+    else:
       self.console.write( 'capturelimit "%s"' % data )
-   return True
+    return True
 
   def cmd_patimelimit(self, data, client, cmd=None):
-   """\
-   <minutes> - Set the minutes before map is over.
-   """
-   if not data:
+    """\
+    <minutes> - Set the minutes before map is over.
+    """
+    if not data:
       client.message('^7Invalid or missing data, try !help timelimit')
       return False
-   else:
+    else:
       self.console.write( 'timelimit "%s"' % data )
-   return True
+    return True
 
   def cmd_pafraglimit(self, data, client, cmd=None):
-   """\
-   <frags> - Set the ammount of points to be scored before map is over.
-   """
-   if not data:
+    """\
+    <frags> - Set the ammount of points to be scored before map is over.
+    """
+    if not data:
       client.message('^7Invalid or missing data, try !help fraglimit')
       return False
-   else:
+    else:
       self.console.write( 'fraglimit "%s"' % data )
-   return True
+    return True
 
   def cmd_pabluewave(self, data, client, cmd=None):
-   """\
-   <seconds> - Set the blue wave respawn time.
-   """
-   if not data:
+    """\
+    <seconds> - Set the blue wave respawn time.
+    """
+    if not data:
       client.message('^7Invalid or missing data, try !help bluewave')
       return False
-   else:
+    else:
       self.console.write( 'g_bluewave "%s"' % data )
-   return True
+    return True
 
   def cmd_paredwave(self, data, client, cmd=None):
-   """\
-   <seconds> - Set the red wave respawn time.
-   """
-   if not data:
+    """\
+    <seconds> - Set the red wave respawn time.
+    """
+    if not data:
       client.message('^7Invalid or missing data, try !help redwave')
       return False
-   else:
+    else:
       self.console.write( 'g_redwave "%s"' % data )
-   return True
+    return True
 
   def cmd_pahotpotato(self, data, client, cmd=None):
-   """\
-   <minutes> - Set the flag explode time.
-   """
-   if not data:
+    """\
+    <minutes> - Set the flag explode time.
+    """
+    if not data:
       client.message('^7Invalid or missing data, try !help hotpotato')
       return False
-   else:
+    else:
       self.console.write( 'g_hotpotato "%s"' % data )
-   return True
-
-
+    return True
 
   def cmd_pamap(self, data, client, cmd=None):
     """\
@@ -2635,7 +2678,52 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
             match = maplist[:3]
     return match
 
+#------------- SGT --------------------------------------------
+  def cmd_pasetwave(self, data, client, cmd=None):
+    """\
+    <seconds> - Set the wave respawn time for both teams.
+    """
+    if not data:
+      client.message('^7Invalid or missing data, try !help setwave')
+      return False
+    else:
+      self.console.write( 'g_bluewave "%s"' % data )
+      self.console.write( 'g_redwave "%s"' % data )
+      return True
 
+  def cmd_pasetgravity(self, data, client, cmd=None):
+    """\
+    <value> - Set the gravity value. default = 800 (less means less gravity)
+    """
+    if not data:
+      client.message('^7Invalid or missing data, try !help pasetgravity')
+      return False
+    if data == 'def':
+      data = 800
+    self.console.setCvar( 'g_gravity', data )
+    client.message('^7Gravity: %s' % data)
+    return True
+
+  def set_configmode(self, mode=None):
+    if mode:
+      if self.gameconfig.has_key('mode_%s' % mode):
+        cfgfile = self.gameconfig('mode_%s' % mode)
+        filename = os.path.join(self.console.game.fs_homepath,self.console.game.fs_game, cfgfile)
+        if os.path.isfile(filename):
+          self.debug('Executing configfile = [%s]', cfgfile)
+          self.console.write('exec %s' % cfgfile)
+    cfgfile = None
+    if self._matchmode:
+      if self.gameconfig.has_key('matchon'):
+        cfgfile = self.gameconfig.get('matchon')
+      else:
+        if self.gameconfig.has_key('matchoff'):
+          cfgfile = self.gameconfig.get('matchoff')
+    if cfgfile:
+      filename = os.path.join(self.console.game.fs_homepath,self.console.game.fs_game, cfgfile)
+      if os.path.isfile(filename):
+        self.debug('Executing configfile = [%s]', cfgfile)
+        self.console.write('exec %s' % cfgfile)
 
 if __name__ == '__main__':
     ############# setup test environment ##################
