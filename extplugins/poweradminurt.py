@@ -229,6 +229,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     self.registerEvent(b3.events.EVT_CLIENT_NAME_CHANGE)
     self.registerEvent(b3.events.EVT_CLIENT_KILL)
     self.registerEvent(b3.events.EVT_CLIENT_KILL_TEAM)
+    self.registerEvent(b3.events.EVT_CLIENT_ACTION)
 
     # don't run cron-checks on startup
     self.ignoreSet(self._ignorePlus)
@@ -802,6 +803,8 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
       self.onKill(event.client, event.target, int(event.data[0]))
     elif event.type == b3.events.EVT_CLIENT_KILL_TEAM:
       self.onKillTeam(event.client, event.target, int(event.data[0]))
+    elif event.type == b3.events.EVT_CLIENT_ACTION:
+       self.onAction(event.client, event.data)
     else:
       self.dumpEvent(event)
 
@@ -814,33 +817,55 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     
   def onTeamKill(self, killer, victim, points):
     killer.var(self, 'teamkills', 0).value += 1
-    
+
+  def onAction(self, client, actiontype):
+    if actiontype in ('flag_captured', 'flag_dropped', 'flag_returned', 'bomb_planted', 'bomb_defused'):
+      client.var(self, actiontype, 0).value += 1
+    if actiontype in ('team_CTF_redflag', 'team_CTF_blueflag'):
+      client.var(self, 'flag_taken', 0).value += 1
+
   def dumpEvent(self, event):
     self.debug('poweradminurt.dumpEvent -- Type %s, Client %s, Target %s, Data %s',
       event.type, event.client, event.target, event.data)
+
+  def _teamvar(self, client, var):
+      # return how much variable has changed since player joined its team
+      old = client.var(self, 'prev_' + var, 0).value
+      new = client.var(self, var, 0).value 
+      return new-old
 
   def _getScores(self, clients):
     xlrstats = self.console.getPlugin('xlrstats')
     playerstats = {}
     maxstats = {}
     minstats = {}
-    keys = 'hsratio', 'killratio', 'teamcontrib', 'xhsratio', 'xkillratio'
+    keys = 'hsratio', 'killratio', 'teamcontrib', 'xhsratio', 'xkillratio', 'flagperf', 'bombperf'
     for c in clients:
       if not c.isvar(self, 'teamtime'):
           c.setvar(self, 'teamtime', self.console.time())
       age = (self.console.time() - c.var(self, 'teamtime', 0).value)/60.0
-      kills = max(0, c.var(self, 'kills', 0).value)
-      deaths = max(0, c.var(self, 'deaths', 0).value)
-      teamkills = max(0, c.var(self, 'teamkills', 0).value)
-      hs = c.var(self, 'headhits', 0).value + c.var(self, 'helmethits', 0).value
+      kills = max(0, self._teamvar(c, 'kills'))
+      deaths = max(0, self._teamvar(c, 'deaths'))
+      teamkills = max(0, self._teamvar(c, 'teamkills'))
+      hs = self._teamvar(c, 'headhits') + self._teamvar(c, 'helmethits')
       hsratio = min(1.0, hs/(1.0+kills)) # hs can be greater than kills
       killratio = kills/(1.0+deaths+teamkills) 
       teamcontrib = (kills-deaths-teamkills)/(age+1.0)
+      flag_taken = int(bool(c.var(self, 'flag_taken', 0).value)) # one-time bonus
+      flag_captured = self._teamvar(c, 'flag_captured')
+      flag_returned = self._teamvar(c, 'flag_returned')
+      flagperf = (flag_taken + 5*flag_captured + flag_returned)/(age+1.0)
+      bomb_planted = self._teamvar(c, 'bomb_planted')
+      bomb_defused = self._teamvar(c, 'bomb_defused')
+      bombperf = (bomb_planted + bomb_defused)/(age+1.0)
+
       playerstats[c.id] = {
         'age' : age,
         'hsratio' : hsratio,
         'killratio' : killratio,
         'teamcontrib' : teamcontrib,
+        'flagperf' : flagperf,
+        'bombperf' : bombperf,
       }
       stats = xlrstats and xlrstats.get_PlayerStats(c)
       if stats:
@@ -864,6 +889,9 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
       'hsratio' : 0.3,
       'xkillratio' : 1.0,
       'xhsratio' : 0.5,
+      # weight score for mission objectives higher
+      'flagperf' : 2.0,
+      'bombperf' : 2.0,
     }
     weightsum = sum(weights[key] for key in keys)
     self.debug("score: maxstats=%s" % maxstats)
@@ -874,7 +902,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
       msg = []
       for key in keys:
         denom = maxstats[key]-minstats[key]
-        if not denom:
+        if denom < 0.0001: # accurate at ne nimis
           continue
         msg.append("%s=%.3f" % (key, playerstats[c.id][key]))
         keyscore = weights[key]*(playerstats[c.id][key]-minstats[key])/denom
@@ -883,7 +911,8 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
         else:
           score += keyscore
       score /= weightsum
-      self.debug('score: %s %s score=%.3f %s' % (c.team, c.name, score, ' '.join(msg)))
+      self.debug('score: %s %s score=%.3f age=%.2f %s' % (c.team, c.name, score,
+        playerstats[c.id]['age'], ' '.join(msg)))
       scores[c.id] = score
     return scores
 
@@ -1177,12 +1206,16 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
 
     gametype = self._getGameType()
 
-    if gametype != "tdm":
-        return
+    # run skillbalancer only if current gametype is in autobalance_gametypes list
+    try:
+      self._autobalance_gametypes_array.index(gametype)
+    except:
+      self.debug('Current gametype (%s) is not specified in autobalance_gametypes - skillbalancer disabled', self.console.game.gameType)
+      return None 
 
     if self._skill_balance_mode == 0:
-        # disabled
-        return
+      # disabled
+      return
     
     clients = self.console.clients.getList()
     blue = [ c for c in clients if c.team == b3.TEAM_BLUE ]
@@ -1972,6 +2005,12 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
   def onTeamChange(self, team, client):
     #store the time of teamjoin for autobalancing purposes 
     client.setvar(self, 'teamtime', self.console.time())
+    # remember current stats so we can tell how the player
+    # is performing on the new team
+    for var in ('kills', 'deaths', 'teamkills', 'headhits', 'helmethits',
+        'flag_captured', 'flag_returned', 'bomb_planted', 'bomb_defused'):
+      old = client.var(self, var, 0).value
+      client.setvar(self, "prev_" + var, old)
     self.verbose('Client variable teamtime set to: %s' % client.var(self, 'teamtime').value)
 
     if not self._matchmode and client.isvar(self, 'paforced'):
@@ -2090,7 +2129,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
       self.debug('Current gametype (%s) is not specified in autobalance_gametypes - teambalancer disabled', self.console.game.gameType)
       return None 
 
-    if gametype == "tdm" and self._skill_balance_mode != 0:
+    if self._skill_balance_mode != 0:
       self.debug('Skill balancer is active, not performing classic teamcheck');
         
     if self.console.time() > self._ignoreTill:
