@@ -724,10 +724,14 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
       self.console.cron + self._tcronTab
     if self._sinterval > 0:
       self._scronTab = b3.cron.PluginCronTab(self, self.speccheck, 0, '*/%s' % (self._sinterval))
+<<<<<<< HEAD
       self.console.cron + self._scronTab
     if self._skinterval > 0:
       self._skcronTab = b3.cron.PluginCronTab(self, self.skillcheck, 0, '*/%s' % (self._skinterval))
       self.console.cron + self._skcronTab
+=======
+      self.console.cron + self._scronTab    
+>>>>>>> dahool/master
 
   def getCmd(self, cmd):
     cmd = 'cmd_%s' % cmd
