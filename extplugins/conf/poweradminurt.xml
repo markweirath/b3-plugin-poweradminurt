@@ -98,9 +98,9 @@
     <settings name="skillbalancer">
         <!-- tinterval sets checking intervals in minutes, 0 disables function -->
         <set name="interval">1</set>
-        <!-- how much difference should we tolerate, unit is average team
-        contribution (kills-deaths) per interval for the top players -->
-        <set name="tcdifference">3</set>
+        <!-- how much difference should we tolerate, unit is average kill ratio
+             for the top players -->
+        <set name="difference">0.5</set>
         <!-- mode: 0 = none, 1 = advise, 2 = autobalance, 3 = autoskuffle -->
         <set name="mode">0</set>
     </settings>

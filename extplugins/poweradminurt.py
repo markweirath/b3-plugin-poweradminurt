@@ -240,6 +240,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
         # don't run cron-checks on startup
         self.ignoreSet(self._ignorePlus)
         self._balancing = False
+        self._killhistory = []
 
         # save original vote settings
         try:
@@ -408,7 +409,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
             self._skinterval = 59
 
         try:
-            self._skilldiff = self.config.getint('skillbalancer', 'tcdifference')
+            self._skilldiff = self.config.getint('skillbalancer', 'difference')
         except:
             self._skilldiff = 3
             self.debug('Using default value (%s) for skilldiff', self._skilldiff)
@@ -788,6 +789,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
                 t2.start()
         elif event.type == b3.events.EVT_GAME_ROUND_START:
             self._forgetTeamContrib()
+            self._killhistory = []
             # check for botsupport
             if self._botenable:
                 self.botsdisable()
@@ -827,6 +829,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
         now = time.time()
         killer.var(self, 'teamcontribhist', []).value.append((now, 1))
         victim.var(self, 'teamcontribhist', []).value.append((now, -1))
+        self._killhistory.append((now, killer.team))
 
     def onKillTeam(self, killer, victim, points):
         killer.var(self, 'teamkills', 0).value += 1
@@ -845,7 +848,13 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
         # return how much variable has changed since player joined its team
         old = client.var(self, 'prev_' + var, 0).value
         new = client.var(self, var, 0).value
-        return new - old
+        return new - old 
+
+    def _saveTeamvars(self, client):
+      for var in ('kills', 'deaths', 'teamkills', 'headhits', 'helmethits',
+                  'flag_captured', 'flag_returned', 'bomb_planted', 'bomb_defused'):
+        old = client.var(self, var, 0).value
+        client.setvar(self, "prev_" + var, old)
 
     def _getScores(self, clients):
         xlrstats = self.console.getPlugin('xlrstats')
@@ -853,10 +862,11 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
         maxstats = {}
         minstats = {}
         keys = 'hsratio', 'killratio', 'teamcontrib', 'xhsratio', 'xkillratio', 'flagperf', 'bombperf'
+        now = self.console.time()
         for c in clients:
             if not c.isvar(self, 'teamtime'):
-                c.setvar(self, 'teamtime', self.console.time())
-            age = (self.console.time() - c.var(self, 'teamtime', 0).value) / 60.0
+                c.setvar(self, 'teamtime', now)
+            age = (now - c.var(self, 'teamtime', 0).value) / 60.0
             kills = max(0, self._teamvar(c, 'kills'))
             deaths = max(0, self._teamvar(c, 'deaths'))
             teamkills = max(0, self._teamvar(c, 'teamkills'))
@@ -968,27 +978,44 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
         red = [c for c in clients if c.team == b3.TEAM_RED]
         self.debug("advise: numblue=%d numred=%d" % (len(blue), len(red)))
         diff = self._getTeamScoreDiff(blue, red, scores)
-        bs, rs = self._getRecentTeamContrib(blue, red)
-        tcdiff = bs - rs
-        self.debug('advise: blue=%.2f red=%.2f tcdiff=%.2f' % (bs, rs, tcdiff))
-        # Difference in Average Team Contribution Per Minute
-        self.console.write('DATCPM is %.2f, skill diff is %.2f' %\
-                           (tcdiff, diff))
-        self._advise(tcdiff, 1, 1, 0)
+        bs, rs = self._getAvgKillsRatios(blue, red)
+        avgdiff = bs - rs
+        self.debug('advise: blue=%.2f red=%.2f avgdiff=%.2f' % (bs, rs, avgdiff))
+        self.console.write('Avg kill ratio diff is %.2f, skill diff is %.2f' %\
+                           (avgdiff, diff))
+        self._advise(avgdiff, 1, 1, 0)
 
-    def _getRecentTeamContrib(self, blue, red):
+    def _getRecentKills(self, T):
+        t0 = time.time() - T
+        i = len(self._killhistory)-1
+        while i >= 0:
+            t, team = self._killhistory[i] 
+            if t < t0:
+                break
+            i -= 1
+            yield t, team
+
+    def _getAvgKillsRatios(self, blue, red):
         if not blue or not red:
             return 0.0, 0.0
+        Tmin = 2.0
+        Tmax = 4.0
+        totkpm = len(list((self._getRecentKills(60))))
+        T = max(Tmin, Tmax-0.1*totkpm)
+        self.debug('recent: totkpm=%d T=%.2f' % (totkpm, T))
         recentcontrib = {}
-        T = 2.0 # minutes
         t0 = time.time() - T * 60
         for c in blue + red:
             hist = c.var(self, 'teamcontribhist', []).value
-            contrib = 0
+            k = 0
+            d = 0
             for t, s in hist:
                 if t0 < t:
-                    contrib += s
-            recentcontrib[c.id] = contrib
+                    if s > 0:
+                        k += 1
+                    elif s < 0:
+                        d += 1
+            recentcontrib[c.id] = k/(1.0+d)
         self.debug('recent: %s' % recentcontrib)
 
         def contribcmp(a, b):
@@ -996,16 +1023,19 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
 
         blue = sorted(blue, cmp=contribcmp)
         red = sorted(red, cmp=contribcmp)
-        n = max(1, min(len(blue) / 2, len(red) / 2))
-        bs = float(sum(recentcontrib[c.id] for c in blue[:n])) / n / T
-        rs = float(sum(recentcontrib[c.id] for c in red[:n])) / n / T
-        self.debug('recent: n=%d %.2f %.2f' % (n, bs, rs))
+        n = min(len(blue), len(red))
+        if n > 3:
+            n = 3 + int((n-3)/2)
+        bs = float(sum(recentcontrib[c.id] for c in blue[:n]))/n/T
+        rs = float(sum(recentcontrib[c.id] for c in red[:n]))/n/T
+        self.debug('recent: n=%d T=%.2f %.2f %.2f' % (n, T, bs, rs))
         return bs, rs
 
     def _forgetTeamContrib(self):
         clients = self.console.clients.getList()
         for c in clients:
             c.setvar(self, 'teamcontribhist', [])
+            self._saveTeamvars(c)
 
     def cmd_paunskuffle(self, data, client, cmd=None):
         """\
@@ -1243,25 +1273,24 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
             self.debug('skillcheck: too few players')
             return
 
-        bs, rs = self._getRecentTeamContrib(blue, red)
-        tcdiff = bs - rs
-        absdiff = abs(tcdiff)
+        bs, rs = self._getAvgKillsRatios(blue, red)
+        avgdiff = bs - rs
+        absdiff = abs(avgdiff)
         unbalanced = False
-        self.debug('skillcheck: blue=%.2f red=%.2f tcdiff=%.2f' % (bs, rs, tcdiff))
+        self.debug('skillcheck: blue=%.2f red=%.2f avgdiff=%.2f' % (bs, rs, avgdiff))
 
         if absdiff >= self._skilldiff:
             unbalanced = True
 
         if unbalanced or self._skill_balance_mode == 1:
-            if absdiff > 1:
-                # Difference in Average Team Contribution Per Minute
-                self.console.write('DATCPM is %.2f' % tcdiff)
+            if absdiff > 0.2:
+                self.console.write('Avg kill ratio diff is %.2f' % avgdiff)
                 if self._skill_balance_mode == 1:
                     # Give advice if teams are unfair
-                    self._advise(tcdiff, 2, 1, 1)
+                    self._advise(avgdiff, 2, 1, 1)
                 else:
                     # Only report stronger team, we will balance/skuffle below
-                    self._advise(tcdiff, 0, 1, 1)
+                    self._advise(avgdiff, 0, 1, 1)
 
         if unbalanced:
             if self._skill_balance_mode == 2:
@@ -1271,11 +1300,11 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
 
         return None
 
-    def _advise(self, tcdiff, mode, console, bigtext):
+    def _advise(self, avgdiff, mode, console, bigtext):
         # mode 0: no advice
         # mode 1: give advice
         # mode 2: give advice if teams are unfair
-        absdiff = abs(tcdiff)
+        absdiff = 6*abs(avgdiff) # scaled to old DATCPM values
         unfair = absdiff > 2.31 # constant carefully reviewed by an eminent team of trained Swedish scientistians :)
         word = None
         if 1 <= absdiff < 2:
@@ -1291,10 +1320,10 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
         if 6 <= absdiff:
             word = 'probably cheating :P'
         if word:
-            team = tcdiff < 0 and 'Red' or 'Blue'
+            team = avgdiff < 0 and 'Red' or 'Blue'
             msg = '%s team is %s' % (team, word)
             if unfair and (mode == 1 or mode == 2):
-                msg = '%s team is %s, consider to use !bal' % (team, word)
+                msg = '%s team is %s, use !bal to balance the teams' % (team, word)
             if not unfair and mode == 1:
                 msg = '%s team is %s, but no action necessary yet' % (team, word)
         else:
@@ -2026,13 +2055,10 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     def onTeamChange(self, team, client):
         #store the time of teamjoin for autobalancing purposes
         client.setvar(self, 'teamtime', self.console.time())
+        self.verbose('Client variable teamtime set to: %s' % client.var(self, 'teamtime').value)
         # remember current stats so we can tell how the player
         # is performing on the new team
-        for var in ('kills', 'deaths', 'teamkills', 'headhits', 'helmethits',
-                    'flag_captured', 'flag_returned', 'bomb_planted', 'bomb_defused'):
-            old = client.var(self, var, 0).value
-            client.setvar(self, "prev_" + var, old)
-        self.verbose('Client variable teamtime set to: %s' % client.var(self, 'teamtime').value)
+        self._saveTeamvars(client)
 
         if not self._matchmode and client.isvar(self, 'paforced'):
             forcedTeam = client.var(self, 'paforced').value

@@ -61,19 +61,15 @@ Additionally, we observed that two l33t players in a team could drastically
 shift the balance by keeping players on the other team busy, enabling the other
 players in their team to get better scores.
 
-So, it is sufficient to look at the top players kill rate in each team to see
+So, it is sufficient to look at the top players kill ratio in each team to see
 how the game is being perceived.
 
-So, the bot has a sliding window of 2 minutes when it calculate the DATCPM
-(Difference in Average Team Contribution Per Minute). The average of
-kills-deaths for the top players in each team for the last minute is computed,
-and the difference is taken. This difference shows how the game is progressing,
-the higher the difference the more dominant one team is over the other. The bot
-lists several levels of difference (from the code)
+So, the bot has a sliding window of 2-4 minutes when it calculate the average
+kill ratio for both teams and compares them. The difference shows how the game
+is progressing, the higher the difference the more dominant one team is over
+the other. The bot lists several levels of difference (from the code)
 
-absdiff = abs(tcdiff)
-unfair = absdiff > 2.31
-word = None
+absdiff = 6*abs(avgdiff)
 if 1 <= absdiff < 2:
   word = 'stronger'
 if 2 <= absdiff < 3:
