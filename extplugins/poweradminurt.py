@@ -411,7 +411,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
         try:
             self._skilldiff = self.config.getint('skillbalancer', 'difference')
         except:
-            self._skilldiff = 3
+            self._skilldiff = 0.5
             self.debug('Using default value (%s) for skilldiff', self._skilldiff)
             # set a minimum/maximum teamdifference
         if self._skilldiff < 1:
