@@ -96,7 +96,7 @@
     </settings>
 
     <settings name="skillbalancer">
-        <!-- tinterval sets checking intervals in minutes, 0 disables function -->
+        <!-- interval sets checking intervals in minutes, 0 disables function -->
         <set name="interval">1</set>
         <!-- how much difference should we tolerate, unit is average kill ratio
              for the top players -->
