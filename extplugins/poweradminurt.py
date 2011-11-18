@@ -145,6 +145,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     _tinterval = 0
     _sinterval = 0
     _skinterval = 0
+    _oldadv = (None, None, None)
     _teamred = 0
     _teamblue = 0
     _teamdiff = 0
@@ -1033,6 +1034,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
         return bs, rs
 
     def _forgetTeamContrib(self):
+        self._oldadv = (None, None, None)
         clients = self.console.clients.getList()
         for c in clients:
             c.setvar(self, 'teamcontribhist', [])
@@ -1359,6 +1361,8 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
         absdiff = 5*abs(avgdiff)
         unfair = absdiff > 2.31 # constant carefully reviewed by an eminent team of trained Swedish scientistians :)
         word = None
+        same = 'remains '
+        stronger = 'has become '
         if 1 <= absdiff < 2:
             word = 'stronger'
         if 2 <= absdiff < 4:
@@ -1371,15 +1375,37 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
             word = 'Godlike!'
         if 10 <= absdiff:
             word = 'probably cheating :P'
+            same = 'is '
+            stronger = 'is '
         if word:
+            oldteam, oldword, oldabsdiff = self._oldadv
+            self.debug('advise: oldteam=%s oldword=%s oldabsdiff=%s' % \
+                (oldteam, oldword, oldabsdiff))
             team = avgdiff < 0 and 'Red' or 'Blue'
-            msg = '%s team is %s' % (team, word)
+            if team == oldteam:
+                if word == oldword:
+                    msg = '%s team %s%s' % (team, same, word)
+                elif absdiff > oldabsdiff:
+                    # Stronger team is becoming even stronger
+                    msg = '%s team %s%s' % (team, stronger, word)
+                elif absdiff < oldabsdiff:
+                    # Stronger team is becoming weaker
+                    msg = '%s team is just %s' % (team, word)
+                    if absdiff < 4:
+                        # Difference not too big, teams may soon be fair
+                        unfair = False
+            else:
+                msg = '%s team is now %s' % (team, word)
             if unfair and (mode == 1 or mode == 2):
-                msg = '%s team is %s, use !bal to balance the teams' % (team, word)
+                msg += ', use !bal to balance the teams'
             if not unfair and mode == 1:
-                msg = '%s team is %s, but no action necessary yet' % (team, word)
+                msg += ', but no action necessary yet'
+            self.debug('advise: team=%s word=%s absdiff=%s' % \
+                (team, word, absdiff))
+            self._oldadv = (team, word, absdiff)
         else:
             msg = 'Teams seem fair'
+            self._oldadv = (None, None, None)
         self.console.write(msg)
 
     def cmd_paautoskuffle(self, data, client, cmd=None):
