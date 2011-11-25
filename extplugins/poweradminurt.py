@@ -799,6 +799,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
         elif event.type == b3.events.EVT_GAME_ROUND_START:
             self._forgetTeamContrib()
             self._killhistory = []
+            self._lastbal = time.time()
             # check for botsupport
             if self._botenable:
                 self.botsdisable()
@@ -865,8 +866,8 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
         old = client.var(self, var, 0).value
         client.setvar(self, "prev_" + var, old)
 
-    def _getScores(self, clients):
-        xlrstats = self.console.getPlugin('xlrstats')
+    def _getScores(self, clients, usexlrstats=True):
+        xlrstats = usexlrstats and self.console.getPlugin('xlrstats')
         playerstats = {}
         maxstats = {}
         minstats = {}
@@ -886,10 +887,10 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
             flag_taken = int(bool(c.var(self, 'flag_taken', 0).value)) # one-time bonus
             flag_captured = self._teamvar(c, 'flag_captured')
             flag_returned = self._teamvar(c, 'flag_returned')
-            flagperf = (flag_taken + 5 * flag_captured + flag_returned) / (age + 1.0)
+            flagperf = 10*flag_taken + 20*flag_captured + flag_returned
             bomb_planted = self._teamvar(c, 'bomb_planted')
             bomb_defused = self._teamvar(c, 'bomb_defused')
-            bombperf = (bomb_planted + bomb_defused) / (age + 1.0)
+            bombperf = bomb_planted + bomb_defused
 
             playerstats[c.id] = {
                 'age': age,
@@ -922,8 +923,8 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
             'xkillratio': 1.0,
             'xhsratio': 0.5,
             # weight score for mission objectives higher
-            'flagperf': 2.0,
-            'bombperf': 2.0,
+            'flagperf': 3.0,
+            'bombperf': 3.0,
             }
         weightsum = sum(weights[key] for key in keys)
         self.debug("score: maxstats=%s" % maxstats)
@@ -977,20 +978,38 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
         redscore = self._getTeamScore(red, scores)
         return bluescore - redscore
 
+    def _getTeamScoreDiffForAdvise(self, minplayers=None):
+        clients = self.console.clients.getList()
+        gametype = self._getGameType()
+        tdm = (gametype == 'tdm')
+        scores = self._getScores(clients, usexlrstats=tdm)
+        blue = [c for c in clients if c.team == b3.TEAM_BLUE]
+        red = [c for c in clients if c.team == b3.TEAM_RED]
+        self.debug("advise: numblue=%d numred=%d" % (len(blue), len(red)))
+        if minplayers and len(blue) + len(red) < minplayers:
+            self.debug('advise: too few players')
+            return None, None
+        diff = self._getTeamScoreDiff(blue, red, scores)
+        if tdm:
+            bs, rs = self._getAvgKillsRatios(blue, red)
+            avgdiff = bs - rs
+            self.debug('advise: TDM blue=%.2f red=%.2f avgdiff=%.2f skilldiff=%.2f' %\
+                       (bs, rs, avgdiff, diff))
+        else:
+            # Just looking at kill ratios doesn't work well for CTF, so we base
+            # the balance diff on the skill diff for now. 
+            sinceLast = time.time() - self._lastbal
+            damping = min(1.0, sinceLast/(1.0+60.0*self._minbalinterval))
+            avgdiff = 1.21*diff*damping
+            self.debug('advise: CTF/BOMB avgdiff=%.2f skilldiff=%.2f damping=%.2f' %\
+                       (avgdiff, diff, damping))
+        return avgdiff, diff
+
     def cmd_paadvise(self, data, client, cmd=None):
         """\
         Report team skill balance, and give advice if teams are unfair
         """
-        clients = self.console.clients.getList()
-        scores = self._getScores(clients)
-        blue = [c for c in clients if c.team == b3.TEAM_BLUE]
-        red = [c for c in clients if c.team == b3.TEAM_RED]
-        self.debug("advise: numblue=%d numred=%d" % (len(blue), len(red)))
-        diff = self._getTeamScoreDiff(blue, red, scores)
-        bs, rs = self._getAvgKillsRatios(blue, red)
-        avgdiff = bs - rs
-        self.debug('advise: blue=%.2f red=%.2f avgdiff=%.2f skilldiff=%.2f' %\
-                   (bs, rs, avgdiff, diff))
+        avgdiff, diff = self._getTeamScoreDiffForAdvise()
         self.console.write('Avg kill ratio diff is %.2f, skill diff is %.2f' %\
                            (avgdiff, diff))
         self._advise(avgdiff, 1)
@@ -1072,7 +1091,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
         Skill shuffle. Shuffle players to balanced teams by numbers and skill.
         Locked players are also moved.
         """
-        now = self.console.time()
+        now = time.time()
         sinceLast = now - self._lastbal
         if client.maxLevel < 20 and self.ignoreCheck() and sinceLast < 60*self._minbalinterval:
             client.message('Teams changed recently, please wait a while')
@@ -1222,7 +1241,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
         Move as few players as needed to create teams balanced by numbers AND skill.
         Locked players are not moved.
         """
-        now = self.console.time()
+        now = time.time()
         sinceLast = now - self._lastbal
         if client.maxLevel < 20 and self.ignoreCheck() and sinceLast < 60*self._minbalinterval:
             client.message('Teams changed recently, please wait a while')
@@ -1332,22 +1351,13 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
             # disabled
             return
 
-        clients = self.console.clients.getList()
-        blue = [c for c in clients if c.team == b3.TEAM_BLUE]
-        red = [c for c in clients if c.team == b3.TEAM_RED]
-        self.debug("skillcheck: numblue=%d numred=%d" % (len(blue), len(red)))
+        avgdiff, diff = self._getTeamScoreDiffForAdvise(minplayers=3)
 
-        if len(blue) + len(red) <= 2:
-            self.debug('skillcheck: too few players')
-            return
+        if avgdiff is None:
+            return None
 
-        scores = self._getScores(clients)
-        diff = self._getTeamScoreDiff(blue, red, scores)
-        bs, rs = self._getAvgKillsRatios(blue, red)
-        avgdiff = bs - rs
         absdiff = abs(avgdiff)
         unbalanced = False
-        self.debug('skillcheck: blue=%.2f red=%.2f avgdiff=%.2f skilldiff=%.2f' % (bs, rs, avgdiff, diff))
 
         if absdiff >= self._skilldiff:
             unbalanced = True
