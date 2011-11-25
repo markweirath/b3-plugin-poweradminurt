@@ -145,6 +145,8 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     _tinterval = 0
     _sinterval = 0
     _skinterval = 0
+    _minbalinterval = 0 # minimum time in minutes between !bal or !sk for non-mods
+    _lastbal = 0 # time since last !bal or !sk
     _oldadv = (None, None, None)
     _teamred = 0
     _teamblue = 0
@@ -425,6 +427,12 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
         except:
             self._skill_balance_mode = 0
             self.debug('Using default value (%s) for skill_balance_mode', self._skill_balance_mode)
+
+        try:
+            self._minbalinterval = self.config.getint('skillbalancer', 'min_bal_interval')
+        except:
+            self._minbalinterval = 2
+            self.debug('Using default value (%s) for Skillbalancer Manual Balance Interval', self._minbalinterval)
 
     def LoadVoteDelayer(self):
         #VOTEDELAYER SETUP
@@ -1064,6 +1072,11 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
         Skill shuffle. Shuffle players to balanced teams by numbers and skill.
         Locked players are also moved.
         """
+        now = self.console.time()
+        sinceLast = now - self._lastbal
+        if client.maxLevel < 20 and self.ignoreCheck() and sinceLast < 60*self._minbalinterval:
+            client.message('Teams changed recently, please wait a while')
+            return None
         self._balancing = True
         olddiff, bestdiff, blue, red, scores = self._randTeams(100, 0.1)
         if client:
@@ -1084,6 +1097,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
             self.console.write('^1Cannot improve team balance!')
         self._forgetTeamContrib()
         self._balancing = False
+        self._lastbal = now
 
     def _countSnipers(self, team):
         n = 0
@@ -1208,7 +1222,9 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
         Move as few players as needed to create teams balanced by numbers AND skill.
         Locked players are not moved.
         """
-        if client.maxLevel < 20 and self.ignoreCheck():
+        now = self.console.time()
+        sinceLast = now - self._lastbal
+        if client.maxLevel < 20 and self.ignoreCheck() and sinceLast < 60*self._minbalinterval:
             client.message('Teams changed recently, please wait a while')
             return None
         self._balancing = True
@@ -1226,6 +1242,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
             self.cmd_paskuffle(data, client, cmd)
         self._forgetTeamContrib()
         self._balancing = False
+        self._lastbal = now
 
     def _randTeams(self, times, slack, maxmovesperc=None):
         # randomize teams a few times and pick the most balanced
