@@ -1093,7 +1093,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
         """
         now = time.time()
         sinceLast = now - self._lastbal
-        if client.maxLevel < 20 and self.ignoreCheck() and sinceLast < 60*self._minbalinterval:
+        if client and client.maxLevel < 20 and self.ignoreCheck() and sinceLast < 60*self._minbalinterval:
             client.message('Teams changed recently, please wait a while')
             return None
         self._balancing = True
@@ -1243,7 +1243,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
         """
         now = time.time()
         sinceLast = now - self._lastbal
-        if client.maxLevel < 20 and self.ignoreCheck() and sinceLast < 60*self._minbalinterval:
+        if client and client.maxLevel < 20 and self.ignoreCheck() and sinceLast < 60*self._minbalinterval:
             client.message('Teams changed recently, please wait a while')
             return None
         self._balancing = True
