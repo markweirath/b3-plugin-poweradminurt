@@ -799,7 +799,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
         elif event.type == b3.events.EVT_GAME_ROUND_START:
             self._forgetTeamContrib()
             self._killhistory = []
-            self._lastbal = time.time()
+            self._lastbal = self.console.time()
             # check for botsupport
             if self._botenable:
                 self.botsdisable()
@@ -836,7 +836,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     def onKill(self, killer, victim, points):
         killer.var(self, 'kills', 0).value += 1
         victim.var(self, 'deaths', 0).value += 1
-        now = time.time()
+        now = self.console.time()
         killer.var(self, 'teamcontribhist', []).value.append((now, 1))
         victim.var(self, 'teamcontribhist', []).value.append((now, -1))
         self._killhistory.append((now, killer.team))
@@ -998,7 +998,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
         else:
             # Just looking at kill ratios doesn't work well for CTF, so we base
             # the balance diff on the skill diff for now. 
-            sinceLast = time.time() - self._lastbal
+            sinceLast = self.console.time() - self._lastbal
             damping = min(1.0, sinceLast/(1.0+60.0*self._minbalinterval))
             avgdiff = 1.21*diff*damping
             self.debug('advise: CTF/BOMB avgdiff=%.2f skilldiff=%.2f damping=%.2f' %\
@@ -1015,7 +1015,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
         self._advise(avgdiff, 1)
 
     def _getRecentKills(self, T):
-        t0 = time.time() - T
+        t0 = self.console.time() - T
         i = len(self._killhistory)-1
         while i >= 0:
             t, team = self._killhistory[i] 
@@ -1033,7 +1033,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
         T = max(Tmin, Tmax-0.1*totkpm)
         self.debug('recent: totkpm=%d T=%.2f' % (totkpm, T))
         recentcontrib = {}
-        t0 = time.time() - T * 60
+        t0 = self.console.time() - T * 60
         for c in blue + red:
             hist = c.var(self, 'teamcontribhist', []).value
             k = 0
@@ -1091,7 +1091,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
         Skill shuffle. Shuffle players to balanced teams by numbers and skill.
         Locked players are also moved.
         """
-        now = time.time()
+        now = self.console.time()
         sinceLast = now - self._lastbal
         if client.maxLevel < 20 and self.ignoreCheck() and sinceLast < 60*self._minbalinterval:
             client.message('Teams changed recently, please wait a while')
@@ -1241,7 +1241,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
         Move as few players as needed to create teams balanced by numbers AND skill.
         Locked players are not moved.
         """
-        now = time.time()
+        now = self.console.time()
         sinceLast = now - self._lastbal
         if client.maxLevel < 20 and self.ignoreCheck() and sinceLast < 60*self._minbalinterval:
             client.message('Teams changed recently, please wait a while')
@@ -2140,10 +2140,10 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
 
         if client.maxLevel < self._full_ident_level:
             cmd.sayLoudOrPM(client,
-                            '%s ^4@%s ^2%s' % (self.console.formatTime(time.time()), sclient.id, sclient.exactName))
+                            '%s ^4@%s ^2%s' % (self.console.formatTime(self.console.time()), sclient.id, sclient.exactName))
         else:
             cmd.sayLoudOrPM(client, '%s ^4@%s ^2%s ^2%s ^2%s' % (
-            self.console.formatTime(time.time()), sclient.id, sclient.exactName, sclient.ip,
+            self.console.formatTime(self.console.time()), sclient.id, sclient.exactName, sclient.ip,
             self.console.formatTime(sclient.timeAdd)))
         return True
 
