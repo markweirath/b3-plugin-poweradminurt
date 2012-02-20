@@ -1010,7 +1010,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
         Report team skill balance, and give advice if teams are unfair
         """
         avgdiff, diff = self._getTeamScoreDiffForAdvise()
-        self.console.write('Avg kill ratio diff is %.2f, skill diff is %.2f' %\
+        self.console.say('Avg kill ratio diff is %.2f, skill diff is %.2f' %\
                            (avgdiff, diff))
         self._advise(avgdiff, 1)
 
@@ -1093,7 +1093,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
         """
         now = self.console.time()
         sinceLast = now - self._lastbal
-        if client.maxLevel < 20 and self.ignoreCheck() and sinceLast < 60*self._minbalinterval:
+        if client and client.maxLevel < 20 and self.ignoreCheck() and sinceLast < 60*self._minbalinterval:
             client.message('Teams changed recently, please wait a while')
             return None
         self._balancing = True
@@ -1110,10 +1110,10 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
             self.console.write('bigtext "Skill Shuffle in Progress!"')
             moves = self._move(blue, red, scores)
         if moves:
-            self.console.write('^4Team skill difference was ^1%.2f^4, is now ^1%.2f' % (
+            self.console.say('^4Team skill difference was ^1%.2f^4, is now ^1%.2f' % (
                 olddiff, bestdiff))
         else:
-            self.console.write('^1Cannot improve team balance!')
+            self.console.say('^1Cannot improve team balance!')
         self._forgetTeamContrib()
         self._balancing = False
         self._lastbal = now
@@ -1243,7 +1243,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
         """
         now = self.console.time()
         sinceLast = now - self._lastbal
-        if client.maxLevel < 20 and self.ignoreCheck() and sinceLast < 60*self._minbalinterval:
+        if client and client.maxLevel < 20 and self.ignoreCheck() and sinceLast < 60*self._minbalinterval:
             client.message('Teams changed recently, please wait a while')
             return None
         self._balancing = True
@@ -1254,7 +1254,7 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
         if bestdiff is not None:
             self.console.write('bigtext "Balancing teams!"')
             self._move(bestblue, bestred, scores)
-            self.console.write('^4Team skill difference was ^1%.2f^4, is now ^1%.2f' % (
+            self.console.say('^4Team skill difference was ^1%.2f^4, is now ^1%.2f' % (
                 olddiff, bestdiff))
         else:
             # we couldn't beat the previous diff by moving only a few players, do a full skuffle
@@ -1364,8 +1364,8 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
 
         if unbalanced or self._skill_balance_mode == 1:
             if absdiff > 0.2:
-                self.console.write('Avg kill ratio diff is %.2f, skill diff is %.2f' %\
-                                   (avgdiff, diff))
+                self.console.say('Avg kill ratio diff is %.2f, skill diff is %.2f' %\
+                    (avgdiff, diff))
                 if self._skill_balance_mode == 1:
                     # Give advice if teams are unfair
                     self._advise(avgdiff, 2)
@@ -1433,14 +1433,14 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
         else:
             msg = 'Teams seem fair'
             self._oldadv = (None, None, None)
-        self.console.write(msg)
+        self.console.say(msg)
 
     def cmd_paautoskuffle(self, data, client, cmd=None):
         modes = ["0-none", "1-advise", "2-autobalance", "3-autoskuffle"]
         if not data:
             mode = modes[self._skill_balance_mode]
-            self.console.write("Skill balancer mode is '%s'" % mode)
-            self.console.write("Options are %s" % ', '.join(modes))
+            self.console.say("Skill balancer mode is '%s'" % mode)
+            self.console.say("Options are %s" % ', '.join(modes))
             return
         mode = None
         try:
@@ -1451,10 +1451,10 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
                     mode = i
         if mode is not None and 0 <= mode <= 3:
             self._skill_balance_mode = mode
-            self.console.write("Skill balancer mode is now '%s'" % modes[mode])
+            self.console.say("Skill balancer mode is now '%s'" % modes[mode])
             self.skillcheck()
         else:
-            self.console.write("Valid options are %s" % ', '.join(modes))
+            self.console.say("Valid options are %s" % ', '.join(modes))
 
     def cmd_paswap(self, data, client, cmd=None):
         """\
