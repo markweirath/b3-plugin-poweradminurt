@@ -98,9 +98,13 @@
 # * add tests
 # 20/09/2010 - 1.5.7 - BlackMamba
 # * fix !pamute - http://www.bigbrotherbot.net/forums/xlr-releases/poweradminurt-1-4-0-for-urban-terror!/msg15296/#msg15296
+# 25/07/2012 - 1.6 - Courgette
+# * prepare separation of poweradmin plugin for UrT4.1 and UrT4.2
+# * change default config file from xml to ini format
+# * change the way to load from the config the list of plugins to disable in matchmode. See section 'matchmode' in config file
+# * gracefully fallback on default value if cannot read publicmode/usedic from config file
 #
-
-__version__ = '1.5.7'
+__version__ = '1.6'
 __author__  = 'xlr8or'
 
 import b3, time, thread, threading, re
@@ -113,9 +117,10 @@ import os
 import random
 import string
 import traceback
+import ConfigParser
 
 #--------------------------------------------------------------------------------------------------
-class PoweradminurtPlugin(b3.plugin.Plugin):
+class Poweradminurt41Plugin(b3.plugin.Plugin):
 
   # ClientUserInfo and ClientUserInfoChanged lines return different names, unsanitized and sanitized
   # this regexp designed to make sure either one is sanitized before namecomparison in onNameChange()
@@ -424,8 +429,8 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
       self._moon_off_gravity = 800
       self.debug('Using default value (%s) for moon mode OFF', self._moon_off_gravity)
     
-    self.debug('Moon ON gravity: %s' %(self._moon_on_gravity))
-    self.debug('Moon OFF gravity: %s' %(self._moon_off_gravity))
+    self.debug('Moon ON gravity: %s' % self._moon_on_gravity)
+    self.debug('Moon OFF gravity: %s' % self._moon_off_gravity)
     
   def LoadPublicMode(self):
     # PUBLIC MODE SETUP
@@ -433,10 +438,19 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
       self.randnum = self.config.getint('publicmode','randnum')
     except:
       self.randnum = 0
-    
+
     try:
       self.pass_lines = None
-      padic = self.config.getboolean('publicmode','usedic')
+      try:
+        padic = self.config.getboolean('publicmode','usedic')
+      except ConfigParser.NoOptionError:
+        self.warning("cannot find publicmode/usedic in config file, using default : no")
+        padic = False
+      except ValueError, err:
+        self.error("cannot read publicmode/usedic in config file, using default : no")
+        self.debug(err)
+        padic = False
+
       if padic:
         padicfile = self.config.getpath('publicmode','dicfile')
         self.debug('trying to use password dictionnary %s' % padicfile)
@@ -472,12 +486,11 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
     # MATCH MODE SETUP
     self.match_plugin_disable = []
     try:
-      self.debug('pamatch_plugins_disable/plugin : %s' %self.config.get('pamatch_plugins_disable/plugin'))
-      for e in self.config.get('pamatch_plugins_disable/plugin'):
-        self.debug('pamatch_plugins_disable/plugin : %s' %e.text)
-        self.match_plugin_disable.append(e.text)
-    except:
-      self.debug('Can\'t setup pamatch disable plugins because there is no plugins set in config')
+        self.debug('matchmode/plugins_disable : %s' %self.config.get('matchmode', 'plugins_disable'))
+        self.match_plugin_disable = [x for x in re.split('\W+', self.config.get('matchmode', 'plugins_disable')) if x]
+    except ConfigParser.NoOptionError:
+        self.warning(r"cannot find option 'matchmode/plugins_disable' in your config file")
+
 
   def LoadBotSupport(self):
     # BOT SUPPORT SETUP
@@ -2100,63 +2113,3 @@ class PoweradminurtPlugin(b3.plugin.Plugin):
             match = maplist[:3]
     return match
 
-
-
-if __name__ == '__main__':
-    ############# setup test environment ##################
-    from b3.fake import FakeConsole, joe, superadmin
-    from b3.parsers.iourt41 import Iourt41Parser
-    from b3.config import XmlConfigParser
-    
-    ## inherits from both FakeConsole and Iourt41Parser
-    class FakeUrtConsole(FakeConsole, Iourt41Parser):
-        def getCvar(self, cvarName):
-            if self._reCvarName.match(cvarName):
-                #"g_password" is:"^7" default:"scrim^7"
-                val = self.writercon(cvarName)
-                self.debug('Get cvar %s = [%s]', cvarName, val)
-                if val is None:
-                    return None
-                #sv_mapRotation is:gametype sd map mp_brecourt map mp_carentan map mp_dawnville map mp_depot map mp_harbor map mp_hurtgen map mp_neuville map mp_pavlov map mp_powcamp map mp_railyard map mp_rocket map mp_stalingrad^7 default:^7
-    
-                for f in self._reCvar:
-                    m = re.match(f, val)
-                    if m:
-                        #self.debug('line matched %s' % f.pattern)
-                        break
-    
-                if m:
-                    #self.debug('m.lastindex %s' % m.lastindex)
-                    if m.group('cvar').lower() == cvarName.lower() and m.lastindex > 3:
-                        return b3.cvar.Cvar(m.group('cvar'), value=m.group('value'), default=m.group('default'))
-                    elif m.group('cvar').lower() == cvarName.lower():
-                        return b3.cvar.Cvar(m.group('cvar'), value=m.group('value'), default=m.group('value'))
-                else:
-                    return None
-        def writercon(self, msg, maxRetries=None):
-            """Write a message to Rcon/Console"""
-            outputrcon = b3.parsers.q3a_rcon.Rcon(self, (\
-                                 self.config.get('server', 'rcon_ip'), \
-                                 self.config.getint('server', 'port')), \
-                                 self.config.get('server', 'rcon_password'))
-            res = outputrcon.write(msg, maxRetries=maxRetries)
-            outputrcon.flush()
-            return res
-    
-    b3xml = XmlConfigParser()
-    b3xml.load('C:/Users/Thomas/workspace/b3/conf-urt-local/b3.xml')
-    fakeConsole = FakeUrtConsole(b3xml)
-    fakeConsole.startup()
-    
-    p = PoweradminurtPlugin(fakeConsole, config=os.path.dirname(__file__)+'/conf/poweradminurt.xml')
-    p.onStartup()
-    
-    ########################## ok lets test ###########################
-    
-    joe.connects(3)
-    superadmin.connects(1)
-    
-    superadmin.says('!slap joe')
-    superadmin.says('!slap joe 5')
-    
-    time.sleep(30)
