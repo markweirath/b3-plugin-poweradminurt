@@ -1295,7 +1295,6 @@ class Poweradminurt41Plugin(b3.plugin.Plugin):
         self.console.write('g_gametype 0')
         if client:
             client.message('^7game type changed to ^4Free For All')
-        return True
 
     def cmd_patdm(self, data, client, cmd=None):
         """\
@@ -1305,7 +1304,6 @@ class Poweradminurt41Plugin(b3.plugin.Plugin):
         self.console.write('g_gametype 3')
         if client:
             client.message('^7game type changed to ^4Team Death Match')
-        return True
 
     def cmd_pats(self, data, client, cmd=None):
         """\
@@ -1315,7 +1313,6 @@ class Poweradminurt41Plugin(b3.plugin.Plugin):
         self.console.write('g_gametype 4')
         if client:
             client.message('^7game type changed to ^4Team Survivor')
-        return True
 
     def cmd_paftl(self, data, client, cmd=None):
         """\
@@ -1325,7 +1322,6 @@ class Poweradminurt41Plugin(b3.plugin.Plugin):
         self.console.write('g_gametype 5')
         if client:
             client.message('^7game type changed to ^4Follow The Leader')
-        return True
 
     def cmd_pacah(self, data, client, cmd=None):
         """\
@@ -1335,7 +1331,6 @@ class Poweradminurt41Plugin(b3.plugin.Plugin):
         self.console.write('g_gametype 6')
         if client:
             client.message('^7game type changed to ^4Capture And Hold')
-        return True
 
     def cmd_pactf(self, data, client, cmd=None):
         """\
@@ -1345,7 +1340,6 @@ class Poweradminurt41Plugin(b3.plugin.Plugin):
         self.console.write('g_gametype 7')
         if client:
             client.message('^7game type changed to ^4Capture The Flag')
-        return True
 
     def cmd_pabomb(self, data, client, cmd=None):
         """\
@@ -1355,7 +1349,6 @@ class Poweradminurt41Plugin(b3.plugin.Plugin):
         self.console.write('g_gametype 8')
         if client:
             client.message('^7game type changed to ^4Bomb')
-        return True
 
 
     def cmd_paident(self, data, client=None, cmd=None):

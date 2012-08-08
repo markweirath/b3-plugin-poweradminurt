@@ -52,6 +52,15 @@ Added Commands:
 !paident (!id) <name/id> - prints a players B3-id, Guid and IP to screen for demo purposes
 !paversion (!paver) - spits out the version of PowerAdminUrt
 
+
+Commands specific to Urban Terror 4.2
+-------------------------------------
+
+!pakill (!kill) <name/id> - kill a player
+!palms (!lms) - change game type to Last Man Standing
+
+
+
 Each command (except !paversion) can be leveled in the config file.
 
 Autobalancer:
@@ -108,7 +117,7 @@ for they will not function under a different name.
 3. Open your B3.xml file (in b3/conf) and add the next line in the
 <plugins> section of the file:
 
-<plugin name="poweradminurt" priority="13" config="@b3/extplugins/conf/poweradminurt.xml"/>
+<plugin name="poweradminurt" config="@b3/extplugins/conf/poweradminurt.ini"/>
 
 The numer 13 in this just an example. Make sure it fits your
 plugin list.

@@ -45,3 +45,14 @@ class Poweradminurt42Plugin(Poweradminurt41Plugin):
                 return
 
         self.console.write('smite %s' % sclient.cid)
+
+
+
+    def cmd_palms(self, data, client, cmd=None):
+        """\
+        Change game type to Last Man Standing
+        (You can safely use the command without the 'pa' at the beginning)
+        """
+        self.console.write('g_gametype 1')
+        if client:
+            client.message('^7game type changed to ^4Last Man Standing')
