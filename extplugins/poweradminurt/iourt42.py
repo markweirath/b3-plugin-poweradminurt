@@ -16,15 +16,6 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #
-# Changelog:
-# 25/07/2012 - 0.1 - Courgette
-# * prepare separation of poweradmin plugin for UrT4.1 and UrT4.2
-# * implement command !kill <player>
-
-__version__ = '0.1'
-__author__  = 'Courgette'
-
-
 from poweradminurt.iourt41 import Poweradminurt41Plugin
 
 class Poweradminurt42Plugin(Poweradminurt41Plugin):

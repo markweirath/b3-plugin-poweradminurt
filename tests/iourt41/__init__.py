@@ -56,6 +56,7 @@ class Iourt41TestCase(unittest.TestCase):
         self.admin = FakeClient(self.console, name="Level-40-Admin", exactName="Level-40-Admin", guid="875sasda", groupBits=16, team=TEAM_UNKNOWN, teamId=0, squad=0)
         self.superadmin = FakeClient(self.console, name="God", exactName="God", guid="f4qfer654r", groupBits=128, team=TEAM_UNKNOWN, teamId=0, squad=0)
 
+        logging.getLogger('output').setLevel(logging.DEBUG)
 
     def tearDown(self):
         self.console.working = False
