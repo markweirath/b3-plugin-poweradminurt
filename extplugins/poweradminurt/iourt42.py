@@ -26,7 +26,7 @@ class Poweradminurt42Plugin(Poweradminurt41Plugin):
         (You can safely use the command without the 'pa' at the beginning)
         """
         if not data:
-            client.message('^7Invalid data, try !help panuke')
+            client.message('^7Invalid data, try !help pakill')
             return
         else:
             sclient = self._adminPlugin.findClientPrompt(data, client)

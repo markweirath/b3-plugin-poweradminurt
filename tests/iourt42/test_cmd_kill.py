@@ -37,7 +37,7 @@ pakill-kill: 20
     def test_no_argument(self):
         self.moderator.message_history = []
         self.moderator.says("!kill")
-        self.assertEqual(['Invalid data, try !help panuke'], self.moderator.message_history)
+        self.assertEqual(['Invalid data, try !help pakill'], self.moderator.message_history)
         self.console.write.assert_has_calls([])
 
 

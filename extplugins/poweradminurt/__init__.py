@@ -109,8 +109,10 @@
 # * fix checkunknown feature
 # * name checker: provide exact reason for warning in log
 # * fix plugin version since UrT 4.1/4.2 split
+# 13/09/2012 - 1.6.2 - Courgette
+# * UrT42: fix feedback message on missing parameter for the !pakill command
 #
-__version__ = '1.6.1'
+__version__ = '1.6.2'
 __author__  = 'xlr8or'
 
 
