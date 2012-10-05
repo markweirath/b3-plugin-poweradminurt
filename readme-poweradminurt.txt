@@ -10,10 +10,10 @@
 # http://www.gnu.org/copyleft/gpl.html
 ###################################################################################
 
-PowerAdminUrt (v1.4.0b3) for B3
+PowerAdminUrt for B3
 ###################################################################################
 
-This plugin works for 4.1 only! This plugin adds powerfull commands 
+This plugin works for Urban Terror 4.1 and 4.2. This plugin adds powerfull commands
 and functions to your b3:
 
 Added Commands:
@@ -98,7 +98,7 @@ Requirements:
 ###################################################################################
 
 - ioUrT
-- B3 version 1.1.3 or higher
+- B3 version 1.8.2 or higher
 
 
 Installation of the B3 plugin:
