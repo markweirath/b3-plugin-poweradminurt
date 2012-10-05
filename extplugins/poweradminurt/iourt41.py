@@ -21,6 +21,7 @@ import b3.events
 import b3.plugin
 import b3.cron
 from b3.functions import soundex, levenshteinDistance
+from poweradminurt import __version__, __author__
 
 import os
 import random
@@ -95,6 +96,11 @@ class Poweradminurt41Plugin(b3.plugin.Plugin):
     _autobalance_gametypes = 'tdm'
     _autobalance_gametypes_array = []
     _max_dic_size = 512000 #max dictionary size in bytes
+
+    # hit locations
+    _hitloc_head = 0
+    _hitloc_helmet = 1
+    _hitloc_torso = 2
 
     def startup(self):
         """\
@@ -1687,24 +1693,24 @@ class Poweradminurt41Plugin(b3.plugin.Plugin):
             victim.setvar(self, 'totalhitted', t)
 
             # headshots... no helmet!
-            if hitloc == 0:
+            if hitloc == self._hitloc_head:
                 t = attacker.var(self, 'headhits').value + 1
                 attacker.setvar(self, 'headhits', t)
                 t = victim.var(self, 'headhitted').value + 1
                 victim.setvar(self, 'headhitted', t)
 
             # helmethits
-            elif hitloc == 1:
+            elif hitloc == self._hitloc_helmet:
                 t = attacker.var(self, 'helmethits').value + 1
                 attacker.setvar(self, 'helmethits', t)
 
             # torso... no kevlar!
-            elif hitloc == 2:
+            elif hitloc == self._hitloc_torso:
                 t = victim.var(self, 'torsohitted').value + 1
                 victim.setvar(self, 'torsohitted', t)
 
             # announce headshots
-            if self._hsall == True and (hitloc == 0 or hitloc == 1):
+            if self._hsall == True and hitloc in (self._hitloc_head, self._hitloc_helmet):
                 headshots = attacker.var(self, 'headhits').value + attacker.var(self, 'helmethits').value
                 hstext = 'headshots'
                 if headshots == 1:

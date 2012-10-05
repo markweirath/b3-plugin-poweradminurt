@@ -20,6 +20,11 @@ from poweradminurt.iourt41 import Poweradminurt41Plugin
 
 class Poweradminurt42Plugin(Poweradminurt41Plugin):
 
+    # hit locations
+    _hitloc_head = 1
+    _hitloc_helmet = 4
+    _hitloc_torso = 5
+
     def cmd_pakill(self, data, client, cmd=None):
         """\
         <player> - kill a player.
