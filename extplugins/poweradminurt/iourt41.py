@@ -129,15 +129,7 @@ class Poweradminurt41Plugin(b3.plugin.Plugin):
         self._adminPlugin.registerCommand(self, 'paversion', 0, self.cmd_paversion, 'paver')
 
         # Register our events
-        self.verbose('Registering events')
-        self.registerEvent(b3.events.EVT_GAME_ROUND_START)
-        self.registerEvent(b3.events.EVT_GAME_EXIT)
-        #self.registerEvent(b3.events.EVT_CLIENT_JOIN)
-        self.registerEvent(b3.events.EVT_CLIENT_AUTH)
-        self.registerEvent(b3.events.EVT_CLIENT_DISCONNECT)
-        self.registerEvent(b3.events.EVT_CLIENT_TEAM_CHANGE)
-        self.registerEvent(b3.events.EVT_CLIENT_DAMAGE)
-        self.registerEvent(b3.events.EVT_CLIENT_NAME_CHANGE)
+        self.registerEvents()
 
         # don't run cron-checks on startup
         self.ignoreSet(60)
@@ -161,6 +153,18 @@ class Poweradminurt41Plugin(b3.plugin.Plugin):
             self._origgear = 0 # allow all weapons
 
         self.debug('Started')
+
+
+    def registerEvents(self):
+        self.verbose('Registering events')
+        self.registerEvent(b3.events.EVT_GAME_ROUND_START)
+        self.registerEvent(b3.events.EVT_GAME_EXIT)
+        #self.registerEvent(b3.events.EVT_CLIENT_JOIN)
+        self.registerEvent(b3.events.EVT_CLIENT_AUTH)
+        self.registerEvent(b3.events.EVT_CLIENT_DISCONNECT)
+        self.registerEvent(b3.events.EVT_CLIENT_TEAM_CHANGE)
+        self.registerEvent(b3.events.EVT_CLIENT_DAMAGE)
+        self.registerEvent(b3.events.EVT_CLIENT_NAME_CHANGE)
 
 
     def onLoadConfig(self):

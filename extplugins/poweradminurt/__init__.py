@@ -113,8 +113,10 @@
 # * UrT42: fix feedback message on missing parameter for the !pakill command
 # 05/10/2012 - 1.6.3 - Courgette
 # * UrT42: fix the headshot counter by introducing hit location constants
+# 06/10/2012 - 1.7 - Courgette
+# * UrT42: add the radio spam protection feature
 #
-__version__ = '1.6.3'
+__version__ = '1.7'
 __author__  = 'xlr8or'
 
 
