@@ -115,9 +115,11 @@
 # * UrT42: fix the headshot counter by introducing hit location constants
 # 06/10/2012 - 1.7 - Courgette
 # * UrT42: add the radio spam protection feature
+# 21/10/2012 - 1.8 - Courgette
+# * UrT42: change: update to new rcon mute command behavior introduced in UrT 4.2.004
 #
-__version__ = '1.7'
-__author__  = 'xlr8or'
+__version__ = '1.8'
+__author__  = 'xlr8or, courgette'
 
 
 """

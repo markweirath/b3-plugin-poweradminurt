@@ -18,6 +18,7 @@
 #
 from poweradminurt.iourt41 import Poweradminurt41Plugin
 
+
 class Poweradminurt42Plugin(Poweradminurt41Plugin):
 
     # hit locations
@@ -113,7 +114,7 @@ class Poweradminurt42Plugin(Poweradminurt41Plugin):
                 if data == last_message_data:
                     points += 3
             if gap < 1:
-                points += 2
+                points += 3
 
         spamins = client.var(self, 'radio_spamins', 0).value + points
 
@@ -132,10 +133,7 @@ class Poweradminurt42Plugin(Poweradminurt41Plugin):
 
         # should we warn ?
         if spamins >= self._rsp_maxSpamins:
-            self.console.writelines([
-                "mute %s 0" % client.cid, # unmute
-                "mute %s %s" % (client.cid, self._rsp_mute_duration) # to make sure to mute
-            ])
+            self.console.writelines(["mute %s %s" % (client.cid, self._rsp_mute_duration)])
             client.setvar(self, 'radio_spamins', int(self._rsp_maxSpamins / 2.0))
             client.setvar(self, 'radio_ignore_till', int(self.getTime() + self._rsp_mute_duration - 1))
 

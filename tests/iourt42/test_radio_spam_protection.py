@@ -1,6 +1,7 @@
 # -*- encoding: utf-8 -*-
 from mock import Mock, call
 from mockito import when
+import sys
 from b3.config import CfgConfigParser
 from b3.cvar import Cvar
 from poweradminurt import PoweradminurtPlugin
@@ -72,7 +73,7 @@ enable: True
 mute_duration: 2
 """)
         self.joe.connects("0")
-        self.console.write = Mock()
+        self.console.write = Mock(wraps=lambda x: sys.stderr.write("%s\n" % x))
         self.joe.warn = Mock()
 
         def joe_radio(msg_group, msg_id, location, text):
