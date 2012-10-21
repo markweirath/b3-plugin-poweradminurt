@@ -17,6 +17,7 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #
 from poweradminurt.iourt41 import Poweradminurt41Plugin
+from poweradminurt import __version__, __author__
 
 
 class Poweradminurt42Plugin(Poweradminurt41Plugin):
