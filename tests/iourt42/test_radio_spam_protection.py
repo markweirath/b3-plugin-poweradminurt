@@ -96,15 +96,7 @@ mute_duration: 2
         when(self.p).getTime().thenReturn(0)
         joe_radio(3, 3, "Patio Courtyard", "Requesting medic. Status: healthy")
         # THEN
-        assertSpampoints(7)
-        self.assertEqual(0, self.joe.warn.call_count)
-        self.assertEqual(0, self.console.write.call_count)
-
-        # WHEN
-        when(self.p).getTime().thenReturn(1)
-        joe_radio(3, 1, "Patio Courtyard", "f00")
-        # THEN
-        assertSpampoints(9)
+        assertSpampoints(8)
         self.assertEqual(0, self.joe.warn.call_count)
         self.assertEqual(0, self.console.write.call_count)
 
@@ -113,4 +105,5 @@ mute_duration: 2
         joe_radio(3, 1, "Patio Courtyard", "f00")
         # THEN
         assertSpampoints(5)
+        self.assertEqual(0, self.joe.warn.call_count)
         self.console.write.assert_has_calls([call("mute 0 2")])
