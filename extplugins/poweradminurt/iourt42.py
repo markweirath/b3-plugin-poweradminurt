@@ -172,6 +172,7 @@ class Poweradminurt42Plugin(Poweradminurt41Plugin):
         self.console.write('g_gametype 1')
         if client:
             client.message('^7game type changed to ^4Last Man Standing')
+        self.set_configmode('lms')
 
 
 

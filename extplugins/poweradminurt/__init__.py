@@ -99,6 +99,11 @@
 # * add tests
 # 20/09/2010 - 1.5.7 - BlackMamba
 # * fix !pamute - http://www.bigbrotherbot.net/forums/xlr-releases/poweradminurt-1-4-0-for-urban-terror!/msg15296/#msg15296
+# 20/09/2011 - 1.5.8 - SGT
+# * minor fix for b3 1.7 compatibility
+# * fix method onKillTeam
+# 25/09/2011 - 1.5.9 - xlr8or
+# * Code reformat by convention
 # 25/07/2012 - 1.6 - Courgette
 # * prepare separation of poweradmin plugin for UrT4.1 and UrT4.2
 # * change default config file from xml to ini format
@@ -120,8 +125,10 @@
 # 27/10/2012 - 1.9 - Courgette
 # * change: remove command pamap now that the B3 admin plugin map command can provide suggestions and does fuzzy matching
 # * change: command !setnextmap now gets map suggestions from the B3 parser
+# 28/10/2012 - 1.10 - Courgette
+# * merge from xlr8or/master
 #
-__version__ = '1.9'
+__version__ = '1.10'
 __author__  = 'xlr8or, courgette'
 
 
