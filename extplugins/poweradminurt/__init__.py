@@ -117,8 +117,11 @@
 # * UrT42: add the radio spam protection feature
 # 21/10/2012 - 1.8 - Courgette
 # * UrT42: change: update to new rcon mute command behavior introduced in UrT 4.2.004
+# 27/10/2012 - 1.9 - Courgette
+# * change: remove command pamap now that the B3 admin plugin map command can provide suggestions and does fuzzy matching
+# * change: command !setnextmap now gets map suggestions from the B3 parser
 #
-__version__ = '1.8'
+__version__ = '1.9'
 __author__  = 'xlr8or, courgette'
 
 
