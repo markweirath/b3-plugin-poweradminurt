@@ -10,10 +10,10 @@
 # http://www.gnu.org/copyleft/gpl.html
 ###################################################################################
 
-PowerAdminUrt (v1.4.0b3) for B3
+PowerAdminUrt for B3
 ###################################################################################
 
-This plugin works for 4.1 only! This plugin adds powerfull commands 
+This plugin works for Urban Terror 4.1 and 4.2. This plugin adds powerfull commands
 and functions to your b3:
 
 Added Commands:
@@ -52,6 +52,15 @@ Added Commands:
 !paident (!id) <name/id> - prints a players B3-id, Guid and IP to screen for demo purposes
 !paversion (!paver) - spits out the version of PowerAdminUrt
 
+
+Commands specific to Urban Terror 4.2
+-------------------------------------
+
+!pakill (!kill) <name/id> - kill a player
+!palms (!lms) - change game type to Last Man Standing
+
+
+
 Each command (except !paversion) can be leveled in the config file.
 
 Autobalancer:
@@ -89,7 +98,7 @@ Requirements:
 ###################################################################################
 
 - ioUrT
-- B3 version 1.1.3 or higher
+- B3 version 1.8.2 or higher
 
 
 Installation of the B3 plugin:
@@ -98,20 +107,18 @@ Installation of the B3 plugin:
 To install the b3-plugin part:
 
 1. Unzip the contents of this package. Go to the unzipped folder extplugins and
-place the .py file in the bots folder b3/extplugins and the config file .xml in
-the b3/extplugins/conf folder.
+copy the 'poweradminurt' folder that contains the .py file in the bots folder b3/extplugins.
+Then copy the config file .ini in the b3/extplugins/conf folder.
 
-2. Open the .xml file with your favorit editor and modify the
-levels if you want them different. Do not edit the command-names
+2. Open the .ini file with your favorite editor and modify the
+commands levels if you want them different. Do not edit the command-names
 for they will not function under a different name.
 
-3. Open your B3.xml file (in b3/conf) and add the next line in the
+3. Open your b3.xml file (in b3/conf) and add the next line in the
 <plugins> section of the file:
 
-<plugin name="poweradminurt" priority="13" config="@b3/extplugins/conf/poweradminurt.xml"/>
+<plugin name="poweradminurt" config="@b3/extplugins/conf/poweradminurt.ini"/>
 
-The numer 13 in this just an example. Make sure it fits your
-plugin list.
 
 Important!
 ###################################################################################
@@ -121,15 +128,6 @@ Open the file with your favorite text editor and look for the next line:
 Change it to:
     <set name="spectator">1h, ^7spectator too long on full server</set>
 
-Changelog
-###################################################################################
-v1.0.0b1       : Beta version 1 for closed beta group testing. 
-v1.0.0         : Initial release. 
-v1.2.0         : Compatible with UrT v4.1 and a few bugs fixed
-                 (thanks to 'Courgette'!)
-v1.3.0         : Release
-v1.4.0b1       : Added and improved functionality
-v1.4.0b3       : Fixed some minor bugs and added multipunish to !slap and !nuke 
 
 ###################################################################################
 xlr8or - 29 july 2008 - www.bigbrotherbot.com // www.xlr8or.com
